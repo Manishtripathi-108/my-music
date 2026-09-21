@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 
 import { Geist, Geist_Mono } from 'next/font/google';
 
+import 'goey-toast/styles.css';
+
 import '@/app/globals.css';
+import ToastProvider from '@/components/ui/ToastProvider';
 import { ThemeScript } from '@/hooks/useTheme';
 
 const geistSans = Geist({
@@ -32,6 +35,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
             </head>
             <body className="bg-background text-foreground flex min-h-screen flex-col font-sans antialiased transition-colors duration-300">
                 {children}
+                <ToastProvider />
             </body>
         </html>
     );

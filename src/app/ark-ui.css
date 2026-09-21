@@ -1,0 +1,126 @@
+/* Ark UI — Custom Variants & Shared Interaction Styles */
+
+/* -------------------------------------------------------------------------- */
+/*  1. State variants                                                         */
+/*     Ark UI uses `data-state` for open/closed, checked/unchecked, etc.      */
+/* -------------------------------------------------------------------------- */
+
+@custom-variant ark-open (&[data-state="open"]);
+@custom-variant ark-closed (&[data-state="closed"]);
+@custom-variant ark-checked (&[data-state="checked"]);
+@custom-variant ark-unchecked (&[data-state="unchecked"]);
+@custom-variant ark-indeterminate (&[data-state="indeterminate"]);
+@custom-variant ark-complete (&[data-state="complete"]);
+@custom-variant ark-incomplete (&[data-state="incomplete"]);
+@custom-variant ark-current (&[data-current], &[data-state="current"]);
+
+/* -------------------------------------------------------------------------- */
+/*  2. Boolean presence variants                                              */
+/*     Ark UI sets these as bare attributes (no value) when active.           */
+/* -------------------------------------------------------------------------- */
+
+@custom-variant ark-disabled (&[data-disabled]);
+@custom-variant ark-invalid (&[data-invalid]);
+@custom-variant ark-required (&[data-required]);
+@custom-variant ark-readonly (&[data-readonly]);
+@custom-variant ark-focus (&[data-focus]);
+@custom-variant ark-focus-visible (&[data-focus-visible]);
+@custom-variant ark-hover (&[data-hover]);
+@custom-variant ark-active (&[data-active]);
+@custom-variant ark-selected (&[data-selected]);
+@custom-variant ark-highlighted (&[data-highlighted]);
+@custom-variant ark-dragging (&[data-dragging]);
+@custom-variant ark-expanded (&[data-expanded]);
+@custom-variant ark-placeholder-shown (&[data-placeholder-shown]);
+@custom-variant ark-swiping (&[data-swiping]);
+@custom-variant ark-today (&[data-today]);
+@custom-variant ark-range-start (&[data-range-start]);
+@custom-variant ark-range-end (&[data-range-end]);
+@custom-variant ark-in-range (&[data-in-range]);
+@custom-variant ark-outside-range (&[data-outside-range]);
+@custom-variant ark-unavailable (&[data-unavailable]);
+
+/* -------------------------------------------------------------------------- */
+/*  3. Orientation variants                                                   */
+/*     Tabs, RadioGroup, Accordion, Slider, Progress, etc.                    */
+/* -------------------------------------------------------------------------- */
+
+@custom-variant ark-horizontal (&[data-orientation="horizontal"]);
+@custom-variant ark-vertical (&[data-orientation="vertical"]);
+
+/* -------------------------------------------------------------------------- */
+/*  4. Placement / side variants                                              */
+/*     Menu, Popover, Tooltip, Select positioners.                            */
+/* -------------------------------------------------------------------------- */
+
+@custom-variant ark-top (&[data-side="top"]);
+@custom-variant ark-bottom (&[data-side="bottom"]);
+@custom-variant ark-left (&[data-side="left"]);
+@custom-variant ark-right (&[data-side="right"]);
+@custom-variant ark-swipe-right (&[data-swipe-direction="right"]);
+@custom-variant ark-swipe-left (&[data-swipe-direction="left"]);
+@custom-variant ark-swipe-up (&[data-swipe-direction="up"]);
+@custom-variant ark-swipe-down (&[data-swipe-direction="down"]);
+
+/* -------------------------------------------------------------------------- */
+/*  5. Group variants (parent → child)                                        */
+/*     Style children based on their Ark UI parent's state.                   */
+/* -------------------------------------------------------------------------- */
+
+@custom-variant ark-group-open {
+    :where([data-state='open']) & {
+        @slot;
+    }
+}
+
+@custom-variant ark-group-closed {
+    :where([data-state='closed']) & {
+        @slot;
+    }
+}
+
+@custom-variant ark-group-disabled {
+    :where([data-disabled]) & {
+        @slot;
+    }
+}
+
+@custom-variant ark-group-invalid {
+    :where([data-invalid]) & {
+        @slot;
+    }
+}
+
+@custom-variant ark-group-checked {
+    :where([data-state='checked']) & {
+        @slot;
+    }
+}
+
+@custom-variant ark-group-highlighted {
+    :where([data-highlighted]) & {
+        @slot;
+    }
+}
+
+@custom-variant ark-group-selected {
+    :where([data-selected]) & {
+        @slot;
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  6. ScrollArea viewport                                                    */
+/*     Hide native scrollbars so only the Ark UI custom scrollbar shows.      */
+/* -------------------------------------------------------------------------- */
+
+@layer base {
+    [data-scope='scroll-area'][data-part='viewport'] {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+}

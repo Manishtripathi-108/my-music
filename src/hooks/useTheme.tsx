@@ -7,45 +7,123 @@ import { flushSync } from 'react-dom';
 import { isBrowser } from '@/lib/utils/core.utils';
 
 /* ---------------------------------- Types --------------------------------- */
-export type ThemeType = 'light' | 'dark' | 'system';
 
-export type ResolvedTheme = 'light' | 'dark';
+/** The theme the user picked. `'system'` follows the OS setting. */
+export type ThemeMode = 'light' | 'dark' | 'system';
 
+/** The theme actually shown on screen (`'system'` already turned into light or dark). */
+export type ActiveTheme = 'light' | 'dark';
+
+/** Shape of the reveal animation played when the theme changes. */
 export type TransitionShape = 'circle' | 'diamond' | 'square' | 'star' | 'hexagon' | 'wipe-down' | 'wipe-up' | 'wipe-right' | 'wipe-left';
 
+/** A transition shape plus display text. Handy for building a shape picker. */
 export interface ShapeOption {
+    /** Shape id. This is also the value saved in localStorage. */
     id: TransitionShape;
+    /** Short name to show in the UI. */
     label: string;
+    /** One-line description of how the animation looks. */
     description: string;
 }
 
-type ThemeMetaMode = 'css-variable' | 'custom';
+/** Where the `theme-color` meta tag gets its value from. */
+export type MetaColorMode = 'css-variable' | 'custom';
 
-type ThemeMetaConfig = {
-    mode?: ThemeMetaMode;
+/** Controls how the `<meta name="theme-color">` tag is updated. */
+export type MetaColorConfig = {
+    /** `'css-variable'` reads a CSS variable, `'custom'` uses `light` / `dark` below. */
+    mode?: MetaColorMode;
+    /** Color used in light theme when `mode` is `'custom'`. */
     light?: string;
+    /** Color used in dark theme when `mode` is `'custom'`. */
     dark?: string;
+    /** CSS variable to read when `mode` is `'css-variable'`. Defaults to `--color-background`. */
     cssVar?: string;
 };
 
-type ThemeChangeDetail = {
-    theme: ThemeType;
-    resolvedTheme: ResolvedTheme;
+/** Data sent with the theme change event. */
+export type ThemeChangeDetail = {
+    /** The mode the user picked. */
+    mode: ThemeMode;
+    /** The theme now shown on screen. */
+    activeTheme: ActiveTheme;
+    /** Animation length in milliseconds. */
     duration: number;
+    /** Shape that was selected at the time of the change. */
     shape: TransitionShape;
 };
 
+/** Options accepted by {@link useTheme}. */
+export interface UseThemeOptions {
+    /** Animation length in milliseconds. Defaults to `450`. */
+    duration?: number;
+    /** Settings for the browser `theme-color` meta tag. */
+    metaColor?: MetaColorConfig;
+}
+
+/** Sets a mode directly, or computes it from the current one. */
+export type SetMode = (value: ThemeMode | ((current: ThemeMode) => ThemeMode)) => void;
+
+/** Value returned by {@link useTheme}. */
+export interface UseThemeReturn {
+    /** The mode the user picked (`'light'`, `'dark'` or `'system'`). */
+    mode: ThemeMode;
+    /** The theme currently shown on screen (`'light'` or `'dark'`). */
+    activeTheme: ActiveTheme;
+    /** The mode that comes after the current one when cycling. */
+    nextMode: ThemeMode;
+    /** The selected transition shape. */
+    shape: TransitionShape;
+    /** All transition shapes the user can choose from. */
+    shapes: ShapeOption[];
+    /** Set the mode, or pass a function that receives the current mode. */
+    setMode: SetMode;
+    /** Set the transition shape. */
+    setShape: (shape: TransitionShape) => void;
+    /** Jump to the next mode (light → dark → system) without animation. */
+    cycleMode: () => void;
+    /**
+     * Jump to the next mode with a reveal animation.
+     * Falls back to {@link UseThemeReturn.cycleMode} if the View Transition API is missing.
+     *
+     * @param x - Animation start X in px. Defaults to screen center.
+     * @param y - Animation start Y in px. Defaults to screen center.
+     * @param shapeOverride - Use this shape once instead of the saved one.
+     */
+    cycleModeAnimated: (x?: number, y?: number, shapeOverride?: TransitionShape) => void;
+}
+
 /* -------------------------------- Constants ------------------------------- */
-const THEME_KEY = 'theme';
+
+/** localStorage key that stores the selected mode. */
+const THEME_STORAGE_KEY = 'theme';
+
+/** Window event fired when the mode changes in the current tab. */
 const THEME_CHANGE_EVENT = 'my-music-theme-change';
 
-const SHAPE_KEY = 'theme-transition-shape';
+/** Mode used when nothing is saved yet. */
+const DEFAULT_MODE: ThemeMode = 'system';
+
+/** localStorage key that stores the selected transition shape. */
+const SHAPE_STORAGE_KEY = 'theme-transition-shape';
+
+/** Window event fired when the shape changes in the current tab. */
 const SHAPE_CHANGE_EVENT = 'my-music-shape-change';
+
+/** Shape used when nothing is saved yet. */
 const DEFAULT_SHAPE: TransitionShape = 'circle';
 
-const PREFERS_COLOR_SCHEME_DARK = '(prefers-color-scheme: dark)';
-const DEFAULT_META_CSS_VAR = '--color-background';
+/** Media query that matches when the OS prefers dark. */
+const DARK_QUERY = '(prefers-color-scheme: dark)';
 
+/** CSS variable read for the meta color when none is configured. */
+const DEFAULT_META_VAR = '--color-background';
+
+/** Clip path that covers the whole screen. Used as the end state of wipe animations. */
+const FULL_SCREEN_CLIP = 'polygon(0 0, 100% 0, 100% 100%, 0 100%)';
+
+/** Every transition shape with its label and description. */
 export const TRANSITION_SHAPES: ShapeOption[] = [
     { id: 'circle', label: 'Circle', description: 'Expanding circular ripple (Default)' },
     { id: 'diamond', label: 'Diamond', description: 'Geometric 45° rhombus expansion' },
@@ -58,40 +136,102 @@ export const TRANSITION_SHAPES: ShapeOption[] = [
     { id: 'wipe-left', label: 'Cinematic Left', description: 'Right-to-left cinematic wipe' },
 ];
 
-/** ---------------------------------- Utils --------------------------------- */
+/* ---------------------------------- Utils --------------------------------- */
 
-/* Read theme from localStorage. Falls back to system. */
-const getStoredTheme = (): ThemeType => {
+/**
+ * Reads the saved mode from localStorage.
+ *
+ * @returns The saved mode, or `'system'` if nothing valid is saved.
+ */
+const getSavedMode = (): ThemeMode => {
     if (isBrowser) {
-        const stored = localStorage.getItem(THEME_KEY) as ThemeType | null;
+        const saved = localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
 
-        if (stored === 'light' || stored === 'dark' || stored === 'system') {
-            return stored;
+        if (saved === 'light' || saved === 'dark' || saved === 'system') {
+            return saved;
         }
     }
 
-    return 'system';
+    return DEFAULT_MODE;
 };
 
-/* Read transition shape from localStorage. Defaults to circle. */
-const getStoredShape = (): TransitionShape => {
+/**
+ * Reads the saved transition shape from localStorage.
+ *
+ * @returns The saved shape, or `'circle'` if nothing valid is saved.
+ */
+const getSavedShape = (): TransitionShape => {
     if (isBrowser) {
-        const stored = localStorage.getItem(SHAPE_KEY) as TransitionShape | null;
-        if (stored && TRANSITION_SHAPES.some((s) => s.id === stored)) {
-            return stored;
+        const saved = localStorage.getItem(SHAPE_STORAGE_KEY) as TransitionShape | null;
+
+        if (saved && TRANSITION_SHAPES.some((option) => option.id === saved)) {
+            return saved;
         }
     }
 
     return DEFAULT_SHAPE;
 };
 
-const getSystemTheme = (): ResolvedTheme => (window.matchMedia(PREFERS_COLOR_SCHEME_DARK).matches ? 'dark' : 'light');
+/**
+ * Asks the browser which theme the OS prefers.
+ *
+ * @returns `'dark'` or `'light'`.
+ */
+const getSystemTheme = (): ActiveTheme => (isBrowser ? (window.matchMedia(DARK_QUERY).matches ? 'dark' : 'light') : 'dark');
 
-/* Convert system theme to concrete light or dark. */
-const resolveTheme = (theme: ThemeType): ResolvedTheme => (theme === 'system' ? getSystemTheme() : theme);
+/**
+ * Turns a mode into the theme that should be shown.
+ * `'system'` becomes the OS theme, other modes stay as they are.
+ *
+ * @param mode - The mode to convert.
+ * @returns `'light'` or `'dark'`.
+ */
+const toActiveTheme = (mode: ThemeMode): ActiveTheme => (mode === 'system' ? getSystemTheme() : mode);
 
-/* Apply theme to DOM root and update meta theme color. */
-const applyThemeToDOM = (theme: ResolvedTheme, metaConfig: ThemeMetaConfig | undefined) => {
+/**
+ * Returns the mode that follows the given one: light → dark → system → light.
+ *
+ * @param mode - The current mode.
+ * @returns The next mode in the cycle.
+ */
+const getNextMode = (mode: ThemeMode): ThemeMode => {
+    if (mode === 'light') return 'dark';
+    if (mode === 'dark') return 'system';
+    return 'light';
+};
+
+/**
+ * Updates the `<meta name="theme-color">` tag to match the active theme.
+ * Does nothing if the tag does not exist or no color could be found.
+ *
+ * @param theme - The theme now shown on screen.
+ * @param config - Where to get the color from.
+ */
+const updateMetaColor = (theme: ActiveTheme, config: MetaColorConfig | undefined) => {
+    const metaTag = document.querySelector('meta[name="theme-color"]');
+
+    if (!metaTag) return;
+
+    let color = '';
+
+    if (config?.mode === 'custom') {
+        color = theme === 'dark' ? (config.dark ?? '') : (config.light ?? '');
+    } else {
+        const variable = config?.cssVar ?? DEFAULT_META_VAR;
+        color = getComputedStyle(document.documentElement).getPropertyValue(variable);
+    }
+
+    if (color) metaTag.setAttribute('content', color.trim());
+};
+
+/**
+ * Applies a theme to the page: sets `data-theme`, toggles the `dark` class
+ * and updates the meta color. Skips everything if the theme is already applied.
+ *
+ * @param theme - The theme to show.
+ * @param metaColor - Settings for the meta color update.
+ */
+const applyToDOM = (theme: ActiveTheme, metaColor: MetaColorConfig | undefined) => {
     const root = document.documentElement;
 
     if (root.dataset.theme === theme) return;
@@ -99,248 +239,248 @@ const applyThemeToDOM = (theme: ResolvedTheme, metaConfig: ThemeMetaConfig | und
     root.dataset.theme = theme;
     root.classList.toggle('dark', theme === 'dark');
 
-    const meta = document.querySelector('meta[name="theme-color"]');
-
-    if (!meta) return;
-
-    let color = '';
-
-    if (metaConfig?.mode === 'custom') {
-        color = theme === 'dark' ? (metaConfig.dark ?? '') : (metaConfig.light ?? '');
-    } else {
-        const variable = metaConfig?.cssVar ?? DEFAULT_META_CSS_VAR;
-        color = getComputedStyle(root).getPropertyValue(variable);
-    }
-
-    if (color) meta.setAttribute('content', color.trim());
+    updateMetaColor(theme, metaColor);
 };
 
-const getNextTheme = (theme: ThemeType): ThemeType => {
-    if (theme === 'light') return 'dark';
-    if (theme === 'dark') return 'system';
-    return 'light';
-};
-
-/* Sync theme across tabs and within the same tab via custom event. */
-const subscribeToTheme = (onStoreChange: () => void) => {
+/**
+ * Subscribes to mode changes, both from other tabs (`storage` event)
+ * and from the same tab (custom event). Made for `useSyncExternalStore`.
+ *
+ * @param onChange - Called whenever the mode may have changed.
+ * @returns A function that removes the listeners.
+ */
+const subscribeToMode = (onChange: () => void) => {
     if (!isBrowser) {
         return () => undefined;
     }
 
     const handleStorage = (event: StorageEvent) => {
-        if (event.key === null || event.key === THEME_KEY) {
-            onStoreChange();
+        if (event.key === null || event.key === THEME_STORAGE_KEY) {
+            onChange();
         }
     };
 
     window.addEventListener('storage', handleStorage);
-    window.addEventListener(THEME_CHANGE_EVENT, onStoreChange);
+    window.addEventListener(THEME_CHANGE_EVENT, onChange);
 
     return () => {
         window.removeEventListener('storage', handleStorage);
-        window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange);
-    };
-};
-
-/* Sync transition shape across tabs and components. */
-const subscribeToShape = (onStoreChange: () => void) => {
-    if (!isBrowser) {
-        return () => undefined;
-    }
-
-    const handleStorage = (event: StorageEvent) => {
-        if (event.key === null || event.key === SHAPE_KEY) {
-            onStoreChange();
-        }
-    };
-
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener(SHAPE_CHANGE_EVENT, onStoreChange);
-
-    return () => {
-        window.removeEventListener('storage', handleStorage);
-        window.removeEventListener(SHAPE_CHANGE_EVENT, onStoreChange);
+        window.removeEventListener(THEME_CHANGE_EVENT, onChange);
     };
 };
 
 /**
- * Generate keyframes for clip-path animation according to selected shape
+ * Subscribes to shape changes, both from other tabs (`storage` event)
+ * and from the same tab (custom event). Made for `useSyncExternalStore`.
+ *
+ * @param onChange - Called whenever the shape may have changed.
+ * @returns A function that removes the listeners.
  */
-const getShapeClipPaths = (shape: TransitionShape, cx: number, cy: number, w: number, h: number): [string, string] => {
-    const maxCornerDist = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy));
+const subscribeToShape = (onChange: () => void) => {
+    if (!isBrowser) {
+        return () => undefined;
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+        if (event.key === null || event.key === SHAPE_STORAGE_KEY) {
+            onChange();
+        }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener(SHAPE_CHANGE_EVENT, onChange);
+
+    return () => {
+        window.removeEventListener('storage', handleStorage);
+        window.removeEventListener(SHAPE_CHANGE_EVENT, onChange);
+    };
+};
+
+/**
+ * Builds the start and end `clip-path` values for a shape animation.
+ * The new theme is revealed as the clip path grows from start to end.
+ *
+ * @param shape - Which shape to animate.
+ * @param x - Animation origin X in px.
+ * @param y - Animation origin Y in px.
+ * @param width - Viewport width in px.
+ * @param height - Viewport height in px.
+ * @returns A `[start, end]` pair of CSS `clip-path` values.
+ */
+const getClipPaths = (shape: TransitionShape, x: number, y: number, width: number, height: number): [string, string] => {
+    /** Distance from the origin to the farthest screen corner. Big enough to cover the screen. */
+    const coverRadius = Math.hypot(Math.max(x, width - x), Math.max(y, height - y));
+
+    /** A polygon with all its points stacked on the origin. It is invisible, so it works as a start state. */
+    const collapsed = (points: number) => `polygon(${new Array<string>(points).fill(`${x}px ${y}px`).join(', ')})`;
 
     switch (shape) {
         case 'diamond': {
-            // Rhombus expanding from (cx, cy)
-            const r = (Math.max(cx, w - cx) + Math.max(cy, h - cy)) * 1.2;
-            return [
-                `polygon(${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px)`,
-                `polygon(${cx}px ${cy - r}px, ${cx + r}px ${cy}px, ${cx}px ${cy + r}px, ${cx - r}px ${cy}px)`,
-            ];
+            const reach = (Math.max(x, width - x) + Math.max(y, height - y)) * 1.2;
+            return [collapsed(4), `polygon(${x}px ${y - reach}px, ${x + reach}px ${y}px, ${x}px ${y + reach}px, ${x - reach}px ${y}px)`];
         }
 
         case 'square': {
-            // Centered square expanding outward from click position
-            const r = Math.max(cx, w - cx, cy, h - cy) * 1.45;
+            // Half of the square's side length
+            const half = Math.max(x, width - x, y, height - y) * 1.45;
             return [
-                `polygon(${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px)`,
-                `polygon(${cx - r}px ${cy - r}px, ${cx + r}px ${cy - r}px, ${cx + r}px ${cy + r}px, ${cx - r}px ${cy + r}px)`,
+                collapsed(4),
+                `polygon(${x - half}px ${y - half}px, ${x + half}px ${y - half}px, ${x + half}px ${y + half}px, ${x - half}px ${y + half}px)`,
             ];
         }
 
         case 'star': {
-            // 4-point sparkle with 8 vertices
-            const innerR = maxCornerDist * 1.35;
-            const outerR = innerR * 2.8;
+            // 4-point sparkle made of 8 points: 4 tips (outer) and 4 dents (inner)
+            const inner = coverRadius * 1.35;
+            const outer = inner * 2.8;
+            const diagonal = inner * 0.7;
             return [
-                `polygon(${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px)`,
-                `polygon(${cx}px ${cy - outerR}px, ${cx + innerR * 0.7}px ${cy - innerR * 0.7}px, ${cx + outerR}px ${cy}px, ${cx + innerR * 0.7}px ${cy + innerR * 0.7}px, ${cx}px ${cy + outerR}px, ${cx - innerR * 0.7}px ${cy + innerR * 0.7}px, ${cx - outerR}px ${cy}px, ${cx - innerR * 0.7}px ${cy - innerR * 0.7}px)`,
+                collapsed(8),
+                `polygon(${x}px ${y - outer}px, ${x + diagonal}px ${y - diagonal}px, ${x + outer}px ${y}px, ${x + diagonal}px ${y + diagonal}px, ${x}px ${y + outer}px, ${x - diagonal}px ${y + diagonal}px, ${x - outer}px ${y}px, ${x - diagonal}px ${y - diagonal}px)`,
             ];
         }
 
         case 'hexagon': {
-            // 6-sided polygon expanding outward
-            const r = maxCornerDist * 1.35;
-            const sin30 = 0.5;
-            const cos30 = 0.866025;
+            const radius = coverRadius * 1.35;
+            const dx = radius * 0.866025; // radius * cos(30°)
+            const dy = radius * 0.5; // radius * sin(30°)
             return [
-                `polygon(${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px, ${cx}px ${cy}px)`,
-                `polygon(${cx}px ${cy - r}px, ${cx + r * cos30}px ${cy - r * sin30}px, ${cx + r * cos30}px ${cy + r * sin30}px, ${cx}px ${cy + r}px, ${cx - r * cos30}px ${cy + r * sin30}px, ${cx - r * cos30}px ${cy - r * sin30}px)`,
+                collapsed(6),
+                `polygon(${x}px ${y - radius}px, ${x + dx}px ${y - dy}px, ${x + dx}px ${y + dy}px, ${x}px ${y + radius}px, ${x - dx}px ${y + dy}px, ${x - dx}px ${y - dy}px)`,
             ];
         }
 
         case 'wipe-down': {
-            return ['polygon(0 0, 100% 0, 100% 0, 0 0)', 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'];
+            return ['polygon(0 0, 100% 0, 100% 0, 0 0)', FULL_SCREEN_CLIP];
         }
 
         case 'wipe-up': {
-            return ['polygon(0 100%, 100% 100%, 100% 100%, 0 100%)', 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'];
+            return ['polygon(0 100%, 100% 100%, 100% 100%, 0 100%)', FULL_SCREEN_CLIP];
         }
 
         case 'wipe-right': {
-            return ['polygon(0 0, 0 0, 0 100%, 0 100%)', 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'];
+            return ['polygon(0 0, 0 0, 0 100%, 0 100%)', FULL_SCREEN_CLIP];
         }
 
         case 'wipe-left': {
-            return ['polygon(100% 0, 100% 0, 100% 100%, 100% 100%)', 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'];
+            return ['polygon(100% 0, 100% 0, 100% 100%, 100% 100%)', FULL_SCREEN_CLIP];
         }
 
         case 'circle':
         default: {
-            return [`circle(0px at ${cx}px ${cy}px)`, `circle(${maxCornerDist}px at ${cx}px ${cy}px)`];
+            return [`circle(0px at ${x}px ${y}px)`, `circle(${coverRadius}px at ${x}px ${y}px)`];
         }
     }
 };
 
+/* ---------------------------------- Hook ---------------------------------- */
+
 /**
- * React hook that manages application color theme and transition shape.
+ * Manages the app's color theme and the transition shape used when it changes.
  *
- * The hook provides the current theme, next theme, transition shape, and functions to set or cycle the theme and shape.
- * It also handles applying the theme to the DOM and syncing across tabs.
+ * - Saves the choice in localStorage and keeps all tabs and components in sync.
+ * - Applies the theme to the page (`data-theme`, `dark` class, meta color).
+ * - Follows OS changes while the mode is `'system'`.
+ * - Can play a reveal animation using the View Transition API.
  *
- * @returns An object containing the current theme, next theme, transition shape, and functions to set or cycle the theme and shape.
+ * @param options - Optional settings, see {@link UseThemeOptions}.
+ * @returns Current state and actions, see {@link UseThemeReturn}.
+ *
+ * @example
+ * const { mode, activeTheme, cycleModeAnimated } = useTheme({ duration: 600 });
+ *
+ * <button onClick={(e) => cycleModeAnimated(e.clientX, e.clientY)}>
+ *     {activeTheme}
+ * </button>
  */
-const useTheme = ({
-    duration = 450,
-    meta,
-}: {
-    duration?: number;
-    meta?: ThemeMetaConfig;
-} = {}) => {
-    const syncedTheme = useSyncExternalStore<ThemeType>(subscribeToTheme, getStoredTheme, () => 'system');
-    const syncedShape = useSyncExternalStore<TransitionShape>(subscribeToShape, getStoredShape, () => DEFAULT_SHAPE);
+const useTheme = ({ duration = 450, metaColor }: UseThemeOptions = {}): UseThemeReturn => {
+    const mode = useSyncExternalStore<ThemeMode>(subscribeToMode, getSavedMode, () => DEFAULT_MODE);
+    const shape = useSyncExternalStore<TransitionShape>(subscribeToShape, getSavedShape, () => DEFAULT_SHAPE);
 
-    const nextTheme = getNextTheme(syncedTheme);
+    const nextMode = getNextMode(mode);
 
-    /** Apply theme to DOM root and update meta theme color */
-    const applyTheme = useCallback(
-        (themeValue: ThemeType, currentShape: TransitionShape = syncedShape) => {
-            const resolved = resolveTheme(themeValue);
+    /** Applies a mode to the page, saves it and tells the rest of the app. */
+    const applyMode = useCallback(
+        (newMode: ThemeMode) => {
+            const activeTheme = toActiveTheme(newMode);
 
-            applyThemeToDOM(resolved, meta);
+            applyToDOM(activeTheme, metaColor);
 
             if (isBrowser) {
-                localStorage.setItem(THEME_KEY, themeValue);
+                localStorage.setItem(THEME_STORAGE_KEY, newMode);
 
                 const event = new CustomEvent<ThemeChangeDetail>(THEME_CHANGE_EVENT, {
-                    detail: {
-                        theme: themeValue,
-                        resolvedTheme: resolved,
-                        duration,
-                        shape: currentShape,
-                    },
+                    detail: { mode: newMode, activeTheme, duration, shape },
                 });
 
-                // Dispatch a custom event to notify other tabs and components of the theme change
+                // Tells components in this tab. Other tabs are notified by the browser's `storage` event.
                 window.dispatchEvent(event);
             }
         },
-        [meta, duration, syncedShape]
+        [metaColor, duration, shape]
     );
 
-    /** Set the theme only */
-    const setTheme = useCallback(
-        (value: ThemeType | ((theme: ThemeType) => ThemeType)) => {
-            const nextThemeValue = typeof value === 'function' ? value(getStoredTheme()) : value;
-            applyTheme(nextThemeValue);
+    /** Sets the mode. Accepts a value or a function of the current mode. */
+    const setMode = useCallback<SetMode>(
+        (value) => {
+            const newMode = typeof value === 'function' ? value(getSavedMode()) : value;
+            applyMode(newMode);
         },
-        [applyTheme]
+        [applyMode]
     );
 
-    /** Set the transition shape and update the DOM */
+    /** Saves the transition shape and tells the rest of the app. */
     const setShape = useCallback((newShape: TransitionShape) => {
         if (!isBrowser) return;
-        localStorage.setItem(SHAPE_KEY, newShape);
+        localStorage.setItem(SHAPE_STORAGE_KEY, newShape);
         window.dispatchEvent(new CustomEvent(SHAPE_CHANGE_EVENT));
     }, []);
 
-    // Sync DOM on mount and when theme changes.
-    // Only touches the DOM - does NOT write to localStorage,
-    // so it can't overwrite the user's stored preference during hydration.
+    // Keep the page in sync on mount and whenever the mode changes.
+    // Only touches the DOM and never writes to localStorage,
+    // so it can't overwrite the user's saved choice during hydration.
     useEffect(() => {
         if (!isBrowser) return;
 
-        const resolved = resolveTheme(syncedTheme);
-        applyThemeToDOM(resolved, meta);
+        applyToDOM(toActiveTheme(mode), metaColor);
 
-        // When theme is system listen to OS preference changes.
-        if (syncedTheme !== 'system') return;
+        // In system mode, follow OS theme changes.
+        if (mode !== 'system') return;
 
-        const media = window.matchMedia(PREFERS_COLOR_SCHEME_DARK);
-        const handleChange = () => {
-            const resolved = resolveTheme('system');
-            applyThemeToDOM(resolved, meta);
-        };
+        const media = window.matchMedia(DARK_QUERY);
+        const handleOsChange = () => applyToDOM(toActiveTheme('system'), metaColor);
 
-        media.addEventListener('change', handleChange);
-        return () => media.removeEventListener('change', handleChange);
-    }, [syncedTheme, meta]);
+        media.addEventListener('change', handleOsChange);
+        return () => media.removeEventListener('change', handleOsChange);
+    }, [mode, metaColor]);
 
-    const cycleTheme = useCallback(() => {
-        setTheme((currentTheme) => getNextTheme(currentTheme));
-    }, [setTheme]);
+    /** Moves to the next mode without animation. */
+    const cycleMode = useCallback(() => {
+        setMode((current) => getNextMode(current));
+    }, [setMode]);
 
-    const animateToggleTheme = useCallback(
+    /** Moves to the next mode with a reveal animation starting at (x, y). */
+    const cycleModeAnimated = useCallback(
         (x?: number, y?: number, shapeOverride?: TransitionShape) => {
-            /* Fallback when View Transition API is not supported. */
+            // Fallback when the View Transition API is not supported.
             if (typeof document === 'undefined' || !('startViewTransition' in document)) {
-                cycleTheme();
+                cycleMode();
                 return;
             }
 
-            const activeShape = shapeOverride ?? syncedShape;
+            const chosenShape = shapeOverride ?? shape;
 
-            const transition = document.startViewTransition(() => {
-                flushSync(cycleTheme);
+            const viewTransition = document.startViewTransition(() => {
+                flushSync(cycleMode);
             });
 
-            transition?.ready?.then(() => {
-                const cx = x ?? window.innerWidth / 2;
-                const cy = y ?? window.innerHeight / 2;
-                const w = window.innerWidth;
-                const h = window.innerHeight;
+            viewTransition?.ready?.then(() => {
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                const originX = x ?? width / 2;
+                const originY = y ?? height / 2;
 
-                const [startClip, endClip] = getShapeClipPaths(activeShape, cx, cy, w, h);
+                const [startClip, endClip] = getClipPaths(chosenShape, originX, originY, width, height);
 
                 document.documentElement.animate(
                     {
@@ -354,26 +494,27 @@ const useTheme = ({
                 );
             });
         },
-        [cycleTheme, duration, syncedShape]
+        [cycleMode, duration, shape]
     );
 
     return {
-        theme: syncedTheme,
-        nextTheme,
-        shape: syncedShape,
-        availableShapes: TRANSITION_SHAPES,
-        setTheme,
+        mode,
+        activeTheme: toActiveTheme(mode),
+        nextMode,
+        shape,
+        shapes: TRANSITION_SHAPES,
+        setMode,
         setShape,
-        cycleTheme,
-        animateToggleTheme,
+        cycleMode,
+        cycleModeAnimated,
     };
 };
 
 /**
- * Inline script that runs before React hydration.
+ * Inline script that runs before React hydrates.
  *
- * Prevents a flash of incorrect theme by applying
- * the stored theme immediately during page load.
+ * Prevents a flash of the wrong theme by applying the saved
+ * mode to the page as soon as it loads. Place it in `<head>`.
  */
 export const ThemeScript = () => {
     return (
@@ -382,12 +523,12 @@ export const ThemeScript = () => {
                 __html: `
                     (function () {
                         try {
-                            const theme = localStorage.getItem('${THEME_KEY}') || 'system';
-                            const prefersDark = window.matchMedia('${PREFERS_COLOR_SCHEME_DARK}').matches;
-                            const appliedTheme = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
+                            const mode = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_MODE}';
+                            const prefersDark = window.matchMedia('${DARK_QUERY}').matches;
+                            const activeTheme = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
 
-                            document.documentElement.setAttribute('data-theme', appliedTheme);
-                            document.documentElement.classList.toggle('dark', appliedTheme === 'dark');
+                            document.documentElement.setAttribute('data-theme', activeTheme);
+                            document.documentElement.classList.toggle('dark', activeTheme === 'dark');
                         } catch (e) {
                             console.error("Error applying theme:", e);
                         }

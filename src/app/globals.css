@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@plugin 'tailwindcss-motion';
+@import './ark-ui.css';
 
 :root {
     /* Core */

@@ -2,16 +2,18 @@ import { memo } from 'react';
 
 import { IconProps, Icon as Iconify } from '@iconify/react';
 
-import IconSet, { type Icon } from '@/constants/icons.constants';
+import IconSet from '@/constants/icons.constants';
 import cn from '@/lib/utils/cn';
 
-type Props = {
-    icon: Icon;
-    className?: string;
-} & Omit<IconProps, 'icon' | 'className'>;
+export type IconName = keyof typeof IconSet;
 
-const Icon = ({ icon, className, ...props }: Props) => {
+export interface IconComponentProps extends Omit<IconProps, 'icon' | 'className'> {
+    icon: IconName;
+    className?: string;
+}
+
+export function Icon({ icon, className, ...props }: IconComponentProps) {
     return <Iconify data-component="icon" aria-hidden="true" icon={IconSet[icon]} className={cn('size-full', className)} {...props} />;
-};
+}
 
 export default memo(Icon);

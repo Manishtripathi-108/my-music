@@ -85,6 +85,18 @@
     /* typography */
     --font-sans: var(--font-geist-sans), system-ui, sans-serif;
     --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+    --animate-slide-across: slide-across 1.5s ease-in-out infinite;
+
+    @keyframes slide-across {
+        0% {
+            transform: translateX(-100%);
+        }
+
+        100% {
+            transform: translateX(200%);
+        }
+    }
 }
 
 .dark {

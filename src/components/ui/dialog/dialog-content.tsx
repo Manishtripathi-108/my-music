@@ -20,7 +20,6 @@ export function DialogContent({ className, ...props }: DialogContentProps) {
                     {...props}
                 />
             </ArkDialog.Positioner>
-            ;
         </Portal>
     );
 }

@@ -2,7 +2,7 @@
 @plugin 'tailwindcss-motion';
 @import './ark-ui.css';
 
-:root {
+@theme {
     /* Core */
     --background: oklch(0.985 0.005 270);
     --foreground: oklch(0.18 0.02 270);
@@ -244,7 +244,9 @@
     --color-chart-5: var(--chart-5);
 }
 
+
 @layer base {
+
     *,
     ::before,
     ::after,

@@ -10,7 +10,7 @@ export function DatePickerLabel({ className, ...props }: DatePickerLabelProps) {
     return (
         <ArkDatePicker.Label
             className={cn(
-                'text-foreground ark-disabled:text-muted-foreground ark-invalid:text-destructive text-sm font-semibold tracking-wide',
+                'text-foreground ark-disabled:text-muted-foreground ark-invalid:text-destructive text-xs font-semibold tracking-wide',
                 className
             )}
             {...props}

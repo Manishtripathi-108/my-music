@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils/cn';
 
 const buttonVariants = cva(
     [
-        'group relative inline-flex shrink-0 items-center justify-center flex-1',
+        'group relative inline-flex shrink-0 items-center justify-center',
         'cursor-pointer select-none',
         'font-medium',
         'overflow-hidden',

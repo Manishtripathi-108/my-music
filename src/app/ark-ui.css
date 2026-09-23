@@ -57,10 +57,10 @@
 @custom-variant ark-bottom (&[data-side="bottom"]);
 @custom-variant ark-left (&[data-side="left"]);
 @custom-variant ark-right (&[data-side="right"]);
-@custom-variant ark-swipe-right (&[data-swipe-direction="right"]);
-@custom-variant ark-swipe-left (&[data-swipe-direction="left"]);
-@custom-variant ark-swipe-up (&[data-swipe-direction="up"]);
-@custom-variant ark-swipe-down (&[data-swipe-direction="down"]);
+@custom-variant ark-swipe-right (&[data-swipe-direction="end"], &[data-swipe-direction="right"]);
+@custom-variant ark-swipe-left (&[data-swipe-direction="start"], &[data-swipe-direction="left"]);
+@custom-variant ark-swipe-up (&[data-swipe-direction="up"], &[data-swipe-direction="top"]);
+@custom-variant ark-swipe-down (&[data-swipe-direction="down"], &[data-swipe-direction="bottom"]);
 
 /* -------------------------------------------------------------------------- */
 /*  5. Group variants (parent → child)                                        */

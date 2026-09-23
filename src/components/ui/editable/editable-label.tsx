@@ -10,7 +10,7 @@ export function EditableLabel({ className, ...props }: EditableLabelProps) {
     return (
         <ArkEditable.Label
             className={cn(
-                'text-foreground ark-invalid:text-destructive ark-disabled:text-muted-foreground text-sm font-semibold tracking-wide',
+                'text-foreground ark-invalid:text-destructive ark-disabled:text-muted-foreground text-xs font-semibold tracking-wide',
                 className
             )}
             {...props}

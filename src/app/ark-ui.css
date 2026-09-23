@@ -10,7 +10,7 @@
 @custom-variant ark-checked (&[data-state="checked"]);
 @custom-variant ark-unchecked (&[data-state="unchecked"]);
 @custom-variant ark-indeterminate (&[data-state="indeterminate"]);
-@custom-variant ark-complete (&[data-state="complete"]);
+@custom-variant ark-complete (&[data-state="complete"], &[data-complete]);
 @custom-variant ark-incomplete (&[data-state="incomplete"]);
 @custom-variant ark-current (&[data-current], &[data-state="current"]);
 
@@ -105,6 +105,18 @@
 
 @custom-variant ark-group-selected {
     :where([data-selected]) & {
+        @slot;
+    }
+}
+
+@custom-variant ark-group-current {
+    :where([data-current], [data-state='current']) & {
+        @slot;
+    }
+}
+
+@custom-variant ark-group-complete {
+    :where([data-complete], [data-state='complete']) & {
         @slot;
     }
 }

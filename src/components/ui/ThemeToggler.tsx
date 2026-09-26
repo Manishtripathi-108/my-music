@@ -19,10 +19,11 @@ export function ThemeToggler({ className, ...props }: React.ComponentProps<'div'
         <div className={cn('relative inline-flex items-center', className)} {...props}>
             <Button
                 variant="ghost"
+                size="sm"
                 onClick={handleToggleClick}
                 aria-label={`Theme: ${themeText}. Switch to ${nextMode}`}
                 title={`Theme: ${themeText}. Click to switch to ${nextMode}`}
-                innerClassName="p-1">
+                className="size-8 p-0">
                 <Icon icon={themeIcon} className="size-4" />
             </Button>
         </div>

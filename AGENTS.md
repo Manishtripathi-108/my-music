@@ -182,6 +182,116 @@ Public API of a feature:
 - Route Handlers do HTTP only: method handling, parse input, authenticate/authorize, call feature logic, return response.
 - Errors: `error.tsx` per segment, `global-error.tsx` for the root fallback, `not-found.tsx` for missing content. Use `try/catch` only to add context, recover, convert an error, or return a safe result.
 
+## API response standard
+
+Every Route Handler (`src/app/api/**/route.ts`) must return a strongly typed, predictable `ApiResponse<T>` envelope using the server helpers from `@/server/api`. Never return ad-hoc, unstructured JSON or HTTP 200 for failed operations.
+
+### Envelope structure
+
+Defined in `src/types/api.ts`:
+
+```ts
+// Success Response
+type ApiSuccess<T> = {
+  success: true;
+  data: T;
+  message?: string;
+  meta?: ApiMeta; // pagination, cursor, timestamp, requestId
+};
+
+// Error Response
+type ApiError = {
+  success: false;
+  error: {
+    code: ApiErrorCode; // Stable machine-readable code
+    message: string;    // Human-readable summary
+    details?: unknown;  // Structured field errors (ApiFieldError[]) or debug info
+  };
+};
+
+// Root Discriminated Union
+type ApiResponse<T> = ApiSuccess<T> | ApiError;
+```
+
+### HTTP status code rules
+
+| HTTP Status | Scenario | Server Helper | Default Code |
+| --- | --- | --- | --- |
+| **200 OK** | Successful read, update, or action | `apiSuccess(data, options?)` | — |
+| **201 Created** | Resource created | `apiCreated(data, options?)` | — |
+| **202 Accepted** | Async job queued / long-running task | `apiAccepted(data, options?)` | — |
+| **204 No Content** | Successful deletion or empty action | `apiNoContent()` | — |
+| **400 Bad Request** | Malformed JSON or invalid syntax | `apiBadRequest(message?, options?)` | `BAD_REQUEST` / `MALFORMED_JSON` |
+| **401 Unauthorized** | Missing or invalid authentication | `apiUnauthorized(message?, options?)` | `UNAUTHORIZED` |
+| **403 Forbidden** | Authenticated user lacks permission | `apiForbidden(message?, options?)` | `FORBIDDEN` |
+| **404 Not Found** | Target resource does not exist | `apiNotFound(message?, options?)` | `NOT_FOUND` |
+| **409 Conflict** | State conflict or duplicate entity | `apiConflict(message?, options?)` | `CONFLICT` |
+| **422 Unprocessable** | Input validation failure (Zod) | `apiValidationError(issues, message?)` | `VALIDATION_ERROR` |
+| **429 Too Many Requests** | Rate limit exceeded | `apiRateLimited(message?, options?)` | `RATE_LIMITED` |
+| **500 Server Error** | Unhandled exception | `apiInternalError(err, message?)` | `INTERNAL_SERVER_ERROR` |
+
+### Machine-readable error codes (`ApiErrorCodes`)
+
+Frontend logic must inspect `error.code` rather than parsing human-readable messages. Standard codes in `src/types/api.ts`:
+- `VALIDATION_ERROR`
+- `BAD_REQUEST`, `MALFORMED_JSON`, `INVALID_QUERY_PARAMS`
+- `UNAUTHORIZED`, `SESSION_EXPIRED`, `INVALID_TOKEN`
+- `FORBIDDEN`, `INSUFFICIENT_PERMISSIONS`
+- `NOT_FOUND`, `RESOURCE_NOT_FOUND`
+- `CONFLICT`, `ALREADY_EXISTS`
+- `RATE_LIMITED`
+- `INTERNAL_SERVER_ERROR`, `SERVICE_UNAVAILABLE`, `EXTERNAL_SERVICE_ERROR`
+
+### Validation error rules
+
+- When Zod parsing fails (`parseResult.success === false`), return `apiValidationError(parseResult.error.issues)`.
+- Returns **HTTP 422** with `details: ApiFieldError[]`:
+  ```json
+  {
+    "success": false,
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "Invalid scan request parameters",
+      "details": [
+        { "field": "directory", "message": "Directory path cannot be empty", "code": "too_small" }
+      ]
+    }
+  }
+  ```
+
+### Security and sanitization
+
+- In production (`process.env.NODE_ENV === 'production'`), `apiInternalError()` logs full error traces on the server but returns only a generic, safe error message to the client. Stack traces, file paths, database queries, and environment details must NEVER reach the response body.
+
+### Route handler template
+
+```ts
+import { NextResponse } from 'next/server';
+import { apiAccepted, apiBadRequest, apiInternalError, apiValidationError } from '@/server/api';
+import { myRequestSchema, type MyResponse } from '@/features/my-feature';
+
+export async function POST(request: Request): Promise<NextResponse<MyResponse>> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return apiBadRequest('Malformed JSON body', { code: 'MALFORMED_JSON' });
+  }
+
+  const parseResult = myRequestSchema.safeParse(body);
+  if (!parseResult.success) {
+    return apiValidationError(parseResult.error.issues);
+  }
+
+  try {
+    const result = await processTask(parseResult.data);
+    return apiAccepted(result, { message: 'Task queued successfully' });
+  } catch (error) {
+    return apiInternalError(error, 'Failed to process task');
+  }
+}
+```
+
 ## Naming
 
 - Folders and files: `kebab-case` (`user-card.tsx`, `create-order.ts`, `use-theme.ts`).

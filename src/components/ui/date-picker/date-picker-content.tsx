@@ -10,7 +10,10 @@ export function DatePickerContent({ className, ...props }: DatePickerContentProp
     return (
         <ArkDatePicker.Content
             className={cn(
-                'bg-card text-card-foreground motion-scale-in-50 motion-translate-x-in-[21%] motion-translate-y-in-[-55%] motion-opacity-in-[50%] motion-blur-in-[10px] motion-duration-200 motion-ease-spring-smooth min-w-70 rounded-2xl border p-4 shadow-2xl outline-none',
+                'ark-open:motion-scale-in-95 ark-open:motion-opacity-in-0 ark-open:motion-translate-y-in-[-4px]',
+                'ark-closed:motion-scale-out-95 ark-closed:motion-opacity-out-0 ark-closed:motion-translate-y-out-[-4px] ark-closed:motion-duration-150',
+                'motion-duration-200 motion-ease-spring-smooth',
+                'bg-card text-card-foreground min-w-70 rounded-2xl border p-4 shadow-2xl outline-none',
                 className
             )}
             {...props}

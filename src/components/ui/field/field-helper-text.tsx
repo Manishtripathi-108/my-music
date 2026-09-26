@@ -7,5 +7,5 @@ import cn from '@/lib/utils/cn';
 export type FieldHelperTextProps = ArkField.HelperTextProps;
 
 export function FieldHelperText({ className, ...props }: FieldHelperTextProps) {
-    return <ArkField.HelperText className={cn('text-muted-foreground text-[10px]', className)} {...props} />;
+    return <ArkField.HelperText className={cn('text-muted-foreground ark-group-invalid:hidden text-[10px]', className)} {...props} />;
 }

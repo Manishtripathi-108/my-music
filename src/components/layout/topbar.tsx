@@ -7,6 +7,7 @@ import Badge from '@/components/ui/badge';
 import Button from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import cn from '@/lib/utils/cn';
+import { useScanModalStore } from '@/features/scanner';
 
 export interface TopbarProps extends React.ComponentProps<'header'> {
     /** Brand title displayed next to logo. Defaults to "My Music" */
@@ -15,8 +16,6 @@ export interface TopbarProps extends React.ComponentProps<'header'> {
     subtitle?: string;
     /** Text for the status/version badge. Defaults to "LIBRARY SCANNER" */
     badgeText?: string;
-    /** Optional handler for the quick scan trigger button */
-    onScanClick?: () => void;
     /** Custom actions slot rendered on the right side */
     actions?: React.ReactNode;
     /** Whether to stick to the top with a glassmorphism backdrop blur. Defaults to true */
@@ -27,13 +26,14 @@ export function Topbar({
     title = 'My Music',
     subtitle = 'High-Fidelity Audio Library Engine',
     badgeText = 'LIBRARY SCANNER',
-    onScanClick,
     actions,
     sticky = true,
     className,
     children,
     ...props
 }: TopbarProps) {
+    const { openModal: openScanModal } = useScanModalStore();
+
     return (
         <header
             role="banner"
@@ -68,12 +68,10 @@ export function Topbar({
 
                 {/* Right Controls & Actions */}
                 <div className="flex items-center gap-2.5 sm:gap-3">
-                    {onScanClick && (
-                        <Button variant="outline" size="sm" onClick={onScanClick} className="hidden gap-1.5 sm:inline-flex">
-                            <Icon icon="refresh" className="size-3.5" />
-                            <span>Scan Library</span>
-                        </Button>
-                    )}
+                    <Button variant="outline" size="sm" onClick={openScanModal} className="hidden gap-1.5 sm:inline-flex">
+                        <Icon icon="refresh" className="size-3.5" />
+                        <span>Scan Library</span>
+                    </Button>
 
                     {actions}
 

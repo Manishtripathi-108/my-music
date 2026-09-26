@@ -6,10 +6,10 @@ import Topbar from '@/components/layout/topbar';
 import Badge from '@/components/ui/badge';
 import Button from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { ScanModal, type ScanResponseData } from '@/features/scanner';
+import { ScanModal, useScanModalStore, type ScanResponseData } from '@/features/scanner';
 
 export default function Home() {
-    const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+    const { openModal: openScanModal } = useScanModalStore();
     const [lastScan, setLastScan] = useState<ScanResponseData | null>(null);
 
     return (
@@ -18,12 +18,10 @@ export default function Home() {
             <div className="from-primary/10 pointer-events-none absolute inset-x-0 -top-48 h-96 bg-linear-to-b to-transparent blur-3xl" />
 
             {/* Persistent Top Navigation Bar */}
-            <Topbar onScanClick={() => setIsScanModalOpen(true)} />
+            <Topbar />
 
             <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 pt-4 pb-24 sm:px-6 lg:px-8">
-
                 <main className="flex flex-1 flex-col justify-center gap-8 py-6">
-
                     {/* Central Hero Card with Scan Button */}
                     <div className="bg-card text-card-foreground motion-preset-slide-up-sm motion-duration-500 relative overflow-hidden rounded-3xl border p-8 shadow-sm sm:p-12">
                         <div className="from-primary/5 absolute -top-24 -right-24 size-96 rounded-full bg-radial to-transparent blur-2xl" />
@@ -37,21 +35,19 @@ export default function Home() {
                                 Zod & Axios Powered Indexer
                             </Badge>
 
-                            <h2 className="text-foreground max-w-xl text-3xl font-extrabold tracking-tight sm:text-4xl">
-                                Index Your Music Library
-                            </h2>
+                            <h2 className="text-foreground max-w-xl text-3xl font-extrabold tracking-tight sm:text-4xl">Index Your Music Library</h2>
 
-                            <p className="text-muted-foreground mt-3 max-w-lg text-sm sm:text-base leading-relaxed">
-                                Scan local directories for FLAC, WAV, ALAC, and DSD lossless audio. Extract metadata, build catalog tags,
-                                and verify file checksums.
+                            <p className="text-muted-foreground mt-3 max-w-lg text-sm leading-relaxed sm:text-base">
+                                Scan local directories for FLAC, WAV, ALAC, and DSD lossless audio. Extract metadata, build catalog tags, and verify
+                                file checksums.
                             </p>
 
                             {/* PRIMARY SCAN TRIGGER BUTTON */}
                             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                                 <Button
                                     size="lg"
-                                    onClick={() => setIsScanModalOpen(true)}
-                                    className="gap-2.5 px-6 py-6 text-base font-bold shadow-md hover:shadow-lg transition-all">
+                                    onClick={openScanModal}
+                                    className="gap-2.5 px-6 py-6 text-base font-bold shadow-md transition-all hover:shadow-lg">
                                     <Icon icon="refresh" className="size-5" />
                                     Scan Music Library
                                 </Button>
@@ -61,7 +57,7 @@ export default function Home() {
 
                     {/* Recent Scan Status Card (Displays when a scan has been submitted) */}
                     {lastScan && (
-                        <div className="bg-card text-card-foreground motion-preset-fade motion-duration-300 rounded-2xl border border-primary/30 p-6 shadow-xs">
+                        <div className="bg-card text-card-foreground motion-preset-fade motion-duration-300 border-primary/30 rounded-2xl border p-6 shadow-xs">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="bg-success/10 text-success flex size-10 items-center justify-center rounded-xl">
@@ -90,7 +86,7 @@ export default function Home() {
                             <div className="bg-background mt-4 grid grid-cols-1 gap-3 rounded-xl border p-4 text-xs sm:grid-cols-3">
                                 <div>
                                     <span className="text-muted-foreground text-[11px]">Target Directory</span>
-                                    <p className="text-foreground font-mono font-medium truncate">{lastScan.directory}</p>
+                                    <p className="text-foreground truncate font-mono font-medium">{lastScan.directory}</p>
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground text-[11px]">Scan Mode</span>
@@ -98,7 +94,9 @@ export default function Home() {
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground text-[11px]">Recursive Traversal</span>
-                                    <p className="text-foreground font-medium">{lastScan.recursive ? 'Enabled (All Subfolders)' : 'Disabled (Root Only)'}</p>
+                                    <p className="text-foreground font-medium">
+                                        {lastScan.recursive ? 'Enabled (All Subfolders)' : 'Disabled (Root Only)'}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -152,11 +150,7 @@ export default function Home() {
             </div>
 
             {/* SCAN MODAL COMPONENT */}
-            <ScanModal
-                open={isScanModalOpen}
-                onOpenChange={setIsScanModalOpen}
-                onScanSuccess={(data) => setLastScan(data)}
-            />
+            <ScanModal onScanSuccess={(data) => setLastScan(data)} />
         </div>
     );
 }

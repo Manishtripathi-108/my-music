@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
-import axios from 'axios';
-import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import axios from 'axios';
 import { goeyToast } from 'goey-toast';
+import { useEffect } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 
 import Badge from '@/components/ui/badge';
 import Button from '@/components/ui/button';
@@ -15,13 +15,13 @@ import Icon from '@/components/ui/icon';
 import { RadioGroup, RadioGroupItem, RadioGroupItemControl, RadioGroupItemText, RadioGroupLabel } from '@/components/ui/radio-group';
 import cn from '@/lib/utils/cn';
 
-import { scanRequestSchema, type ScanMode, type ScanRequestInput } from '../schemas/scan-request.schema';
-import type { ScanResponseData } from '../types';
 import type { ApiErrorDetail, ApiFieldError, ApiResponse } from '@/types/api';
+import { scanRequestSchema, type ScanMode, type ScanRequestInput } from '../schemas/scan-request.schema';
+import { useScanModalStore } from '../stores/scan-modal.store';
+import type { ScanResponseData } from '../types';
 
 export interface ScanModalProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
+    /** Callback when a scan job has been queued/initiated successfully. */
     onScanSuccess?: (data: ScanResponseData) => void;
 }
 
@@ -46,7 +46,9 @@ const scanModes = [
     },
 ];
 
-export function ScanModal({ open, onOpenChange, onScanSuccess }: ScanModalProps) {
+export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
+    const { isModalOpen, setModalOpen, closeModal } = useScanModalStore();
+
     const {
         register,
         handleSubmit,
@@ -69,10 +71,10 @@ export function ScanModal({ open, onOpenChange, onScanSuccess }: ScanModalProps)
 
     // Clear server errors whenever the modal opens or closes
     useEffect(() => {
-        if (!open) {
+        if (!isModalOpen) {
             clearErrors();
         }
-    }, [open, clearErrors]);
+    }, [isModalOpen, clearErrors]);
 
     /**
      * Map server-side error responses (including field validation errors and root errors)
@@ -132,7 +134,7 @@ export function ScanModal({ open, onOpenChange, onScanSuccess }: ScanModalProps)
                 }
 
                 // Close modal and reset form
-                onOpenChange(false);
+                setModalOpen(false);
                 reset();
                 return;
             }
@@ -161,7 +163,7 @@ export function ScanModal({ open, onOpenChange, onScanSuccess }: ScanModalProps)
     const rootServerErrorMessage = errors.root?.serverError?.message || errors.root?.message;
 
     return (
-        <Dialog open={open} onOpenChange={(details) => onOpenChange(details.open)}>
+        <Dialog open={isModalOpen} onOpenChange={(details) => setModalOpen(details.open)}>
             <DialogContent className="max-w-xl">
                 <DialogCloseTrigger />
 
@@ -258,7 +260,7 @@ export function ScanModal({ open, onOpenChange, onScanSuccess }: ScanModalProps)
 
                     {/* Actions */}
                     <div className="flex items-center justify-end gap-3">
-                        <Button type="button" variant="ghost" size="sm" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
+                        <Button type="button" variant="ghost" size="sm" disabled={isSubmitting} onClick={() => closeModal()}>
                             Cancel
                         </Button>
                         <Button type="submit" size="sm" disabled={isSubmitting}>

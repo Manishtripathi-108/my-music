@@ -9,7 +9,7 @@ export type ScrollViewportProps = ArkScrollArea.ViewportProps;
 export function ScrollViewport({ className, ...props }: ScrollViewportProps) {
     return (
         <ArkScrollArea.Viewport
-            className={cn('h-full w-full overflow-y-auto p-4 scrollbar-none [&::-webkit-scrollbar]:hidden', className)}
+            className={cn('h-full w-full scrollbar-none overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden', className)}
             {...props}
         />
     );

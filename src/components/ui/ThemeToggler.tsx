@@ -3,6 +3,7 @@
 import Icon from '@/components/ui/icon';
 import useTheme from '@/hooks/useTheme';
 import cn from '@/lib/utils/cn';
+
 import { Button } from './button';
 
 export function ThemeToggler({ className, ...props }: React.ComponentProps<'div'>) {

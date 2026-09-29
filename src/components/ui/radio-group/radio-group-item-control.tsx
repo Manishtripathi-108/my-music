@@ -14,9 +14,7 @@ export function RadioGroupItemControl({ className, children, ...props }: RadioGr
                 className
             )}
             {...props}>
-            {children ?? (
-                <div className="bg-primary-foreground size-1.5 rounded-full opacity-0 transition-opacity group-ark-checked:opacity-100" />
-            )}
+            {children ?? <div className="bg-primary-foreground group-ark-checked:opacity-100 size-1.5 rounded-full opacity-0 transition-opacity" />}
         </ArkRadioGroup.ItemControl>
     );
 }

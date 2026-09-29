@@ -20,9 +20,7 @@ export function Checkbox({ label, description, cardStyle, className, children, .
             {(label || description || children) && (
                 <div className="flex flex-col">
                     {label && <CheckboxLabel>{label}</CheckboxLabel>}
-                    {description && (
-                        <span className="text-muted-foreground text-xs leading-relaxed">{description}</span>
-                    )}
+                    {description && <span className="text-muted-foreground text-xs leading-relaxed">{description}</span>}
                     {children}
                 </div>
             )}

@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
+
+import { type VariantProps, cva } from 'class-variance-authority';
 
 import cn from '@/lib/utils/cn';
 
@@ -18,43 +19,19 @@ const buttonVariants = cva(
     {
         variants: {
             variant: {
-                primary: [
-                    'border-primary bg-primary text-primary-foreground',
-                    'hover:bg-primary/90',
-                    'active:bg-primary/80',
-                ],
+                primary: ['border-primary bg-primary text-primary-foreground', 'hover:bg-primary/90', 'active:bg-primary/80'],
 
-                secondary: [
-                    'border-secondary bg-secondary text-secondary-foreground',
-                    'hover:bg-secondary/80',
-                    'active:bg-secondary/70',
-                ],
+                secondary: ['border-secondary bg-secondary text-secondary-foreground', 'hover:bg-secondary/80', 'active:bg-secondary/70'],
 
-                outline: [
-                    'border-input bg-background text-foreground',
-                    'hover:bg-accent hover:text-accent-foreground',
-                    'active:bg-accent/80',
-                ],
+                outline: ['border-input bg-background text-foreground', 'hover:bg-accent hover:text-accent-foreground', 'active:bg-accent/80'],
 
                 ghost: ['border-transparent bg-transparent text-foreground', 'hover:bg-accent hover:text-accent-foreground', 'active:bg-accent/80'],
 
-                destructive: [
-                    'border-destructive bg-destructive text-destructive-foreground',
-                    'hover:bg-destructive/90',
-                    'active:bg-destructive/80',
-                ],
+                destructive: ['border-destructive bg-destructive text-destructive-foreground', 'hover:bg-destructive/90', 'active:bg-destructive/80'],
 
-                success: [
-                    'border-success bg-success text-success-foreground',
-                    'hover:bg-success/90',
-                    'active:bg-success/80',
-                ],
+                success: ['border-success bg-success text-success-foreground', 'hover:bg-success/90', 'active:bg-success/80'],
 
-                warning: [
-                    'border-warning bg-warning text-warning-foreground',
-                    'hover:bg-warning/90',
-                    'active:bg-warning/80',
-                ],
+                warning: ['border-warning bg-warning text-warning-foreground', 'hover:bg-warning/90', 'active:bg-warning/80'],
 
                 link: [
                     'h-auto rounded-sm border-transparent bg-transparent p-0',

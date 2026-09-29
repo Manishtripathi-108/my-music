@@ -11,5 +11,5 @@ export interface StepsProps extends ArkSteps.RootProps {
 }
 
 export function Steps({ className, ...props }: StepsProps) {
-    return <ArkSteps.Root className={cn('flex w-full ark-horizontal:flex-col ark-vertical:flex-row gap-6', className)} {...props} />;
+    return <ArkSteps.Root className={cn('ark-horizontal:flex-col ark-vertical:flex-row flex w-full gap-6', className)} {...props} />;
 }

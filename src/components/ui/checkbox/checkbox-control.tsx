@@ -3,6 +3,7 @@
 import { Checkbox as ArkCheckbox } from '@ark-ui/react/checkbox';
 
 import cn from '@/lib/utils/cn';
+
 import { CheckboxIndicator } from './checkbox-indicator';
 
 export interface CheckboxControlProps extends ArkCheckbox.ControlProps {

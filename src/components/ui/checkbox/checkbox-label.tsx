@@ -7,12 +7,7 @@ import cn from '@/lib/utils/cn';
 export type CheckboxLabelProps = ArkCheckbox.LabelProps;
 
 export function CheckboxLabel({ className, ...props }: CheckboxLabelProps) {
-    return (
-        <ArkCheckbox.Label
-            className={cn('text-sm font-medium text-foreground select-none', className)}
-            {...props}
-        />
-    );
+    return <ArkCheckbox.Label className={cn('text-foreground text-sm font-medium select-none', className)} {...props} />;
 }
 
 export default CheckboxLabel;

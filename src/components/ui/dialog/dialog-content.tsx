@@ -1,9 +1,9 @@
 'use client';
 
 import { Dialog as ArkDialog } from '@ark-ui/react/dialog';
+import { Portal } from '@ark-ui/react/portal';
 
 import cn from '@/lib/utils/cn';
-import { Portal } from '@ark-ui/react/portal';
 
 export type DialogContentProps = ArkDialog.ContentProps;
 

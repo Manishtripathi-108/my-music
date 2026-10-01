@@ -6,14 +6,16 @@ import 'server-only';
 
 import { serverEnv } from '@/config/env.server';
 
-import type { BatchTagWriteResult, BatchTagWriteTarget, ExifTagValue, TagWriteOptions, TagWriteResult } from '../types';
-import type { ExifClientOptions, ExifCommandRequest, ExifRawRecord } from './types';
+import type { BatchTagWriteFailure, BatchTagWriteResult, BatchTagWriteTarget, ExifTagValue, TagWriteOptions, TagWriteResult } from '../types';
+import type { ArtworkExtractionResult, ExifClientOptions, ExifCommandRequest, ExifRawRecord } from './types';
 
 const DEFAULT_TIMEOUT_MS = 25_000;
 const DEFAULT_QUEUE_SIZE = 500;
 const DEFAULT_OUTPUT_BYTES = 10 * 1024 * 1024;
 const SHUTDOWN_TIMEOUT_MS = 2_000;
 const MAX_ERROR_BYTES = 64 * 1024;
+const MIN_IMAGE_BYTES = 100;
+const ARTWORK_TAGS = ['Picture', 'CoverArt', 'UserDefinedPicture', 'PreviewImage'] as const;
 const isDev = process.env.NODE_ENV === 'development';
 
 /* ----------------------- ExifClient Process Manager ----------------------- */
@@ -336,6 +338,10 @@ export class ExifClient {
 
     /* ---------------------- Public Tag Write Operations ----------------------- */
 
+    /**
+     * Writes or updates metadata tags on an audio file.
+     * Throws an error on failure; returns success details and backup path when preserved.
+     */
     public async writeTags(filePath: string, tags: Record<string, ExifTagValue>, options: TagWriteOptions = {}): Promise<TagWriteResult> {
         const normalizedPath = path.resolve(filePath);
         const preserveOriginal = options.preserveOriginal ?? false;
@@ -344,13 +350,7 @@ export class ExifClient {
         try {
             await fs.promises.access(normalizedPath, fs.constants.F_OK);
         } catch {
-            return {
-                success: false,
-                filePath: normalizedPath,
-                updatedTags: tags,
-                preserveOriginal,
-                error: `File not found: ${normalizedPath}`,
-            };
+            throw new Error(`Audio file not found or inaccessible: "${normalizedPath}"`);
         }
 
         const args: string[] = ['-charset', 'filename=utf8'];
@@ -363,13 +363,7 @@ export class ExifClient {
 
         for (const [tag, value] of Object.entries(tags)) {
             if (!tag || tag.startsWith('-') || /[\r\n]/.test(tag)) {
-                return {
-                    success: false,
-                    filePath: normalizedPath,
-                    updatedTags: tags,
-                    preserveOriginal,
-                    error: `Invalid ExifTool tag name: ${JSON.stringify(tag)}`,
-                };
+                throw new Error(`Invalid ExifTool tag name: ${JSON.stringify(tag)}`);
             }
 
             if (value === null || value === '') {
@@ -392,35 +386,44 @@ export class ExifClient {
 
         args.push(normalizedPath);
 
-        try {
-            await this.execute(args);
+        await this.execute(args);
 
-            const backupPath = `${normalizedPath}_original`;
-            return {
-                success: true,
-                filePath: normalizedPath,
-                updatedTags: tags,
-                preserveOriginal,
-                backupPath: preserveOriginal && fs.existsSync(backupPath) ? backupPath : undefined,
-            };
-        } catch (error) {
-            return {
-                success: false,
-                filePath: normalizedPath,
-                updatedTags: tags,
-                preserveOriginal,
-                error: error instanceof Error ? error.message : String(error),
-            };
+        const backupPath = `${normalizedPath}_original`;
+        let existingBackupPath: string | undefined;
+        if (preserveOriginal) {
+            try {
+                await fs.promises.access(backupPath);
+                existingBackupPath = backupPath;
+            } catch {
+                // Backup file was not created or is inaccessible
+            }
         }
+
+        return {
+            success: true,
+            filePath: normalizedPath,
+            ...(existingBackupPath ? { backupPath: existingBackupPath } : {}),
+        };
     }
 
+    /**
+     * Writes metadata tags across multiple audio files in a single batch,
+     * collecting individual successes and failures.
+     */
     public async writeTagsBatch(targets: BatchTagWriteTarget[], options: TagWriteOptions = {}): Promise<BatchTagWriteResult> {
         const succeeded: TagWriteResult[] = [];
-        const failed: TagWriteResult[] = [];
+        const failed: BatchTagWriteFailure[] = [];
 
         for (const target of targets) {
-            const result = await this.writeTags(target.path, target.tags, options);
-            (result.success ? succeeded : failed).push(result);
+            try {
+                const result = await this.writeTags(target.path, target.tags, options);
+                succeeded.push(result);
+            } catch (error) {
+                failed.push({
+                    filePath: path.resolve(target.path),
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
         }
 
         return {
@@ -436,6 +439,63 @@ export class ExifClient {
         } catch {
             return false;
         }
+    }
+
+    /* -------------------------- Artwork Extraction --------------------------- */
+
+    /**
+     * Extracts embedded binary artwork from an audio file directly into the
+     * destination output file using the persistent ExifTool process.
+     * Tries candidate picture tags in deliberate order.
+     */
+    public async extractArtwork(sourcePath: string, outputPath: string): Promise<ArtworkExtractionResult | null> {
+        if (!sourcePath || typeof sourcePath !== 'string') {
+            throw new Error('Source audio file path must be a non-empty string.');
+        }
+        if (!outputPath || typeof outputPath !== 'string') {
+            throw new Error('Destination artwork path must be a non-empty string.');
+        }
+
+        const normalizedSource = path.resolve(sourcePath);
+        const normalizedOutput = path.resolve(outputPath);
+
+        try {
+            await fs.promises.access(normalizedSource, fs.constants.R_OK);
+        } catch {
+            return null;
+        }
+
+        const outputDir = path.dirname(normalizedOutput);
+        await fs.promises.mkdir(outputDir, { recursive: true });
+        await fs.promises.unlink(normalizedOutput).catch(() => {});
+
+        for (const tag of ARTWORK_TAGS) {
+            try {
+                await this.execute(['-b', `-${tag}`, '-W!', normalizedOutput, '-charset', 'filename=utf8', normalizedSource]);
+
+                try {
+                    const stats = await fs.promises.stat(normalizedOutput);
+                    if (stats.size > MIN_IMAGE_BYTES) {
+                        return {
+                            outputPath: normalizedOutput,
+                            sizeBytes: stats.size,
+                        };
+                    }
+                } catch {
+                    // Tag produced no file or file is inaccessible
+                }
+
+                await fs.promises.unlink(normalizedOutput).catch(() => {});
+            } catch (error) {
+                await fs.promises.unlink(normalizedOutput).catch(() => {});
+                if (this.debug) {
+                    console.warn(`[ExifClient] Extraction tag -${tag} failed on ${normalizedSource}:`, error);
+                }
+            }
+        }
+
+        await fs.promises.unlink(normalizedOutput).catch(() => {});
+        return null;
     }
 
     /* ---------------------- Process Lifecycle & Recovery ---------------------- */

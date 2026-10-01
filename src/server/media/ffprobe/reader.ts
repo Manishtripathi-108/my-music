@@ -154,6 +154,8 @@ export class AudioProber {
 
         const bitsPerSample = this.getBitsPerSample(audioStream);
 
+        const hasAttachedPicture = streams.some((stream) => Number(stream.disposition?.attached_pic) === 1);
+
         return {
             codec,
             codecLongName,
@@ -166,6 +168,7 @@ export class AudioProber {
             channelLayout: audioStream.channel_layout,
             bitsPerSample,
             isLossless: this.isLosslessCodec(codec, containerFormat),
+            hasAttachedPicture,
             streamCount: streams.length,
             rawStreams: streams,
             rawFormat: format,
@@ -229,6 +232,19 @@ export class AudioProber {
 
     private getErrorMessage(error: unknown): string {
         return error instanceof Error ? error.message : String(error);
+    }
+
+    /** Checks whether FFprobe is available and operational. */
+    public async ping(): Promise<boolean> {
+        try {
+            const { stdout } = await execFileAsync(this.binaryPath, ['-version'], {
+                timeout: 5000,
+                windowsHide: true,
+            });
+            return stdout.includes('ffprobe');
+        } catch {
+            return false;
+        }
     }
 }
 

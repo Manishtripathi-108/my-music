@@ -24,3 +24,15 @@ export interface ExifCommandRequest {
     timeoutId?: NodeJS.Timeout;
     id: number;
 }
+
+/**
+ * Result of extracting artwork binary directly to an output file.
+ */
+export interface ArtworkExtractionResult {
+    /** Absolute filesystem path to the extracted file. */
+    outputPath: string;
+
+    /** File size of the extracted image in bytes. */
+    sizeBytes: number;
+}
+

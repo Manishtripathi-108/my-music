@@ -74,7 +74,7 @@ flowchart TD
     end
 
     subgraph ServerLayer["Server Infrastructure (src/server/media) - server-only"]
-        Coordinator["MetadataCoordinator\n- Parallel Inspection Orchestration\n- Tag Normalizer & Artwork Cache\n- In-Flight Extraction Deduplication"]
+        Coordinator["MetaReader\n- Parallel Inspection Orchestration\n- Tag Normalizer & Artwork Cache\n- In-Flight Extraction Deduplication"]
         ExifClient["ExifClient (Stay-Open Daemon)\n- FIFO Command Queue & Protocol Parser\n- Metadata Reads & Atomic Tag Writes\n- Binary Artwork Extraction (-b -Tag -W!)\n- Process Lifecycle & Crash Recovery"]
         AudioProber["AudioProber (Stateless)\n- FFprobe JSON Stream Inspector\n- Lossless Codec Matrix & Attached Picture Detection\n- Bounded-Concurrency Worker Pool"]
     end
@@ -110,7 +110,7 @@ flowchart TD
 
 | Component | Location | Primary Responsibilities & Design Patterns |
 | :--- | :--- | :--- |
-| **`MetadataCoordinator`** | `src/server/media/metadata/coordinator.ts` | **Multi-Source Orchestrator**: Executes `AudioProber` and `ExifClient` concurrently via `Promise.all`. Normalizes conflicting tags into unified `AudioTags`. Manages disk artwork caching (`cache/art`), in-flight extraction request deduplication, and magic-byte format validation. |
+| **`MetaReader`** | `src/server/media/meta/reader.ts` | **Multi-Source Orchestrator**: Executes `AudioProber` and `ExifClient` concurrently via `Promise.all`. Normalizes conflicting tags into unified `AudioTags`. Manages disk artwork caching (`cache/art`), in-flight extraction request deduplication, and magic-byte format validation. |
 | **`ExifClient`** | `src/server/media/exif/client.ts` | **Persistent Process Daemon**: Maintains a single long-lived ExifTool process using `-stay_open True -@ -`. Eliminates ~235ms Perl startup overhead per call. Implements FIFO command queue, atomic tag writing with optional backups, crash auto-recovery, and direct binary artwork extraction (`-b -Tag -W!`). |
 | **`AudioProber`** | `src/server/media/ffprobe/reader.ts` | **Stream Specification Engine**: Direct-instantiation client that executes `ffprobe` to extract audio technical metrics. Evaluates audio streams against lossless codecs, checks bit depth, sample rates, duration, attached-picture disposition, and provides bounded concurrency worker pools. |
 
@@ -125,45 +125,38 @@ sequenceDiagram
     autonumber
     actor Client as HTTP Client
     participant Route as GET /api/media/metadata
-    participant Service as MediaService
-    participant Coord as MetadataCoordinator
+    participant Reader as MetaReader
     participant Probe as AudioProber (FFprobe)
     participant Exif as ExifClient (ExifTool)
-    participant Art as ArtExtractor (FFmpeg)
-    participant Normalizer as Tag Normalizer
 
     Client->>Route: GET /api/media/metadata?path=/music/track.flac
     Route->>Route: Parse & validate query with singleMetadataQuerySchema (Zod)
-    Route->>Service: getAudioMetadata(path)
-    Service->>Service: path.resolve() & fs.existsSync()
-    alt File does not exist
-        Service-->>Route: throw NotFoundError
-        Route-->>Client: 404 Not Found (ApiError envelope)
+    Route->>Reader: read(path)
+    Reader->>Reader: fs.promises.stat() -> get file size & mtime
+    alt File does not exist / inaccessible
+        Reader-->>Route: throw Error
+        Route-->>Client: 404 Not Found (ApiError envelope via handleRouteError)
     end
-    Service->>Coord: readFile(resolvedPath, options)
-    Coord->>Coord: fs.promises.stat() -> get file size & mtime
 
     par Parallel Extraction via Promise.all
-        Coord->>Probe: inspect(resolvedPath)
+        Reader->>Probe: inspect(resolvedPath)
         Probe->>Probe: execFile(ffprobe, [-v quiet, -print_format json, ...])
-        Probe-->>Coord: TechnicalAudioInfo (codec, bitrate, sampleRate, isLossless)
+        Probe-->>Reader: TechnicalAudioInfo (codec, bitrate, sampleRate, isLossless)
     and
-        Coord->>Exif: readMetadata(resolvedPath)
+        Reader->>Exif: readMetadata(resolvedPath)
         Exif->>Exif: enqueue command -> persistent stay-open pipe
-        Exif-->>Coord: ExifRawRecord (raw tags map)
+        Exif-->>Reader: ExifRawRecord (raw tags map)
     and
-        Coord->>Art: extract(resolvedPath, forceRefresh=false)
-        Art->>Art: Check SHA-256 cache key in cache/art
+        Reader->>Reader: extractArtwork(resolvedPath, forceRefresh=false)
+        Reader->>Reader: Check SHA-256 cache key in cache/art
         alt Cache Miss
-            Art->>Art: Extract via FFmpeg / ExifTool -> write to disk
+            Reader->>Exif: extractArtwork(sourcePath, temporaryPath)
+            Exif-->>Reader: write binary to disk -> validate magic bytes
         end
-        Art-->>Coord: ExtractedArtwork (path, mimeType, size)
     end
 
-    Coord->>Normalizer: normalizeAudioTags(rawExifRecord)
-    Normalizer-->>Coord: Unified AudioTags (title, artist, album, genre, replayGain, etc.)
-    Coord-->>Service: CombinedAudioMetadata
-    Service-->>Route: CombinedAudioMetadata
+    Reader->>Reader: normalizeAudioTags(rawExif)
+    Reader-->>Route: CombinedAudioMetadata
     Route-->>Client: 200 OK (ApiSuccess<CombinedAudioMetadata>)
 ```
 
@@ -326,9 +319,9 @@ Extracted binary payloads are checked at the byte level before writing to disk, 
 
 #### HTTP Binary Streaming & Caching
 When a client requests `GET /api/media/artwork?file=<filename>`:
-1. `MediaService.getArtworkBinary()` runs `path.basename(file)` to strictly eliminate path traversal attacks (`../`).
+1. `MetaReader.findArtwork()` runs `path.basename(file)` to strictly eliminate path traversal attacks (`../`).
 2. Checks `cache/art/<filename>` on disk.
-3. Returns a raw binary `Uint8Array` response with production caching headers:
+3. Streams the binary payload via web `ReadableStream` with production caching headers:
    ```http
    HTTP/1.1 200 OK
    Content-Type: image/jpeg
@@ -341,22 +334,19 @@ When a client requests `GET /api/media/artwork?file=<filename>`:
 
 ### 5. Metadata Tag Writing Execution Flow
 
-When updating or deleting metadata (`POST /api/media/tags` or `POST /api/media/tags/batch`), operations pass through strict tag sanitization:
+When updating or deleting metadata (`PATCH /api/media/tags` or `PATCH /api/media/tags/batch`), operations pass through strict tag sanitization:
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Client as HTTP Client
-    participant Route as POST /api/media/tags
-    participant Service as MediaService
+    participant Route as PATCH /api/media/tags
     participant Exif as ExifClient
     participant File as Filesystem Audio File
 
-    Client->>Route: POST /api/media/tags { path, tags, preserveOriginal }
+    Client->>Route: PATCH /api/media/tags { path, tags, preserveOriginal }
     Route->>Route: Validate via writeTagsRequestSchema
-    Route->>Service: writeTags(request)
-    Service->>Service: path.resolve(request.path) & fs.existsSync()
-    Service->>Exif: writeTags(resolvedPath, tags, options)
+    Route->>Exif: writeTags(input.path, input.tags, options)
 
     Exif->>Exif: Validate tag keys (reject leading '-', linebreaks)
     Exif->>Exif: Build arguments:
@@ -368,8 +358,7 @@ sequenceDiagram
         File-->>Exif: Creates original backup (track.flac_original)
     end
 
-    Exif-->>Service: TagWriteResult { success: true, backupPath, updatedTags }
-    Service-->>Route: TagWriteResult
+    Exif-->>Route: TagWriteResult { success: true, filePath, backupPath }
     Route-->>Client: 200 OK (ApiSuccess<TagWriteResult>)
 ```
 
@@ -381,7 +370,7 @@ For large music libraries, the media subsystem uses distinct concurrency mechani
 
 ```mermaid
 flowchart TD
-    subgraph BatchMeta["Batch Metadata Read (POST /api/media/metadata)"]
+    subgraph BatchMeta["Batch Metadata Read (POST /api/media/metadata/batch)"]
         FileList["File Paths List [1..N]"] --> Split["Split Execution into 2 Concurrent Branches"]
         
         Split --> BranchExif["Branch 1: ExifTool Batch Reader"]

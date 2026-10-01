@@ -1,0 +1,58 @@
+meta {
+  name: Batch Write Tags (Happy Path)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/media/tags/batch
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "targets": [
+      {
+        "path": "{{sampleAudioPath}}",
+        "tags": {
+          "AlbumArtist": "Various Artists",
+          "Compilation": 1
+        }
+      },
+      {
+        "path": "{{sampleAudioPathFlac}}",
+        "tags": {
+          "AlbumArtist": "Various Artists",
+          "Compilation": 1
+        }
+      }
+    ],
+    "preserveOriginal": false
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.total: eq 2
+  res.body.data.succeeded: isDefined
+  res.body.data.failed: isDefined
+}
+
+tests {
+  test("should return 200 with batch write results", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.total).to.equal(2);
+  });
+}

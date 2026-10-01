@@ -1,10 +1,12 @@
-import 'server-only';
-
 import { NextResponse } from 'next/server';
+
+import 'server-only';
 import { z } from 'zod';
+
 import type { ApiError } from '@/types/api';
+
+import { BadRequestError, NotFoundError } from './errors';
 import { apiBadRequest, apiInternalError, apiNotFound, apiValidationError } from './response';
-import { NotFoundError, BadRequestError } from './errors';
 
 /* --------------------- Universal Route Error Handler ---------------------- */
 
@@ -13,10 +15,7 @@ import { NotFoundError, BadRequestError } from './errors';
  * Maps domain errors, Zod validation errors, JSON syntax errors,
  * and unknown exceptions to standard ApiError payloads.
  */
-export function handleRouteError(
-    error: unknown,
-    fallbackMessage = 'Internal server error'
-): NextResponse<ApiError> {
+export function handleRouteError(error: unknown, fallbackMessage = 'Internal server error'): NextResponse<ApiError> {
     // 1. Zod validation failure -> 422 Unprocessable Entity
     if (error instanceof z.ZodError) {
         return apiValidationError(error.issues, 'Validation failed');

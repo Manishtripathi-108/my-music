@@ -1,0 +1,46 @@
+meta {
+  name: Start Scan - Happy Path
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/scan
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "directory": "E:/Music",
+    "scanMode": "addNew",
+    "recursive": true
+  }
+}
+
+assert {
+  res.status: eq 202
+  res.body.success: eq true
+  res.body.data.scanId: isDefined
+  res.body.data.directory: eq E:/Music
+  res.body.data.scanMode: eq addNew
+  res.body.data.recursive: eq true
+  res.body.data.timestamp: isDefined
+}
+
+tests {
+  test("should accept scan request with 202 status", function() {
+    expect(res.getStatus()).to.equal(202);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.scanId).to.be.a('string');
+  });
+}

@@ -1,0 +1,40 @@
+meta {
+  name: Write Tags - Empty Tags Object (422)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/media/tags
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "path": "{{sampleAudioPath}}",
+    "tags": {}
+  }
+}
+
+assert {
+  res.status: eq 422
+  res.body.success: eq false
+  res.body.error.code: eq VALIDATION_ERROR
+}
+
+tests {
+  test("should reject empty tags object with 422", function() {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().success).to.be.false;
+  });
+}

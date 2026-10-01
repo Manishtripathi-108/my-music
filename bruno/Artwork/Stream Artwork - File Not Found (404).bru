@@ -1,0 +1,36 @@
+meta {
+  name: Stream Artwork - File Not Found (404)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/media/artwork?file=nonexistent_cover_art_12345.jpg
+  body: none
+  auth: bearer
+}
+
+params:query {
+  file: nonexistent_cover_art_12345.jpg
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+  res.body.success: eq false
+  res.body.error.code: eq NOT_FOUND
+}
+
+tests {
+  test("should return 404 for missing cached cover", function() {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().success).to.be.false;
+  });
+}

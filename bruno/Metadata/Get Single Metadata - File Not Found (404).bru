@@ -1,0 +1,37 @@
+meta {
+  name: Get Single Metadata - File Not Found (404)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/media/metadata?path={{nonExistentAudioPath}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  path: {{nonExistentAudioPath}}
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 404
+  res.body.success: eq false
+  res.body.error.code: eq NOT_FOUND
+}
+
+tests {
+  test("should return 404 for non-existent audio file", function() {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().success).to.be.false;
+    expect(res.getBody().error.code).to.equal('NOT_FOUND');
+  });
+}

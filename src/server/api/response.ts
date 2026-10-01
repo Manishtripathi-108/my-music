@@ -3,14 +3,7 @@ import { NextResponse } from 'next/server';
 import 'server-only';
 import { z } from 'zod';
 
-import {
-    type ApiErrorCode,
-    ApiErrorCodes,
-    type ApiFieldError,
-    type ApiMeta,
-    type ApiError,
-    type ApiSuccess,
-} from '@/types/api';
+import { type ApiError, type ApiErrorCode, ApiErrorCodes, type ApiFieldError, type ApiMeta, type ApiSuccess } from '@/types/api';
 
 /* --------------------------- Options Interfaces --------------------------- */
 
@@ -90,10 +83,7 @@ export function apiError(message: string, options: ApiErrorOptions = {}): NextRe
 /**
  * 400 Bad Request
  */
-export function apiBadRequest(
-    message: string = 'Bad request',
-    options: Omit<ApiErrorOptions, 'status'> = {}
-): NextResponse<ApiError> {
+export function apiBadRequest(message: string = 'Bad request', options: Omit<ApiErrorOptions, 'status'> = {}): NextResponse<ApiError> {
     return apiError(message, {
         status: 400,
         code: options.code ?? ApiErrorCodes.BAD_REQUEST,
@@ -104,10 +94,7 @@ export function apiBadRequest(
 /**
  * 401 Unauthorized
  */
-export function apiUnauthorized(
-    message: string = 'Authentication required',
-    options: Omit<ApiErrorOptions, 'status'> = {}
-): NextResponse<ApiError> {
+export function apiUnauthorized(message: string = 'Authentication required', options: Omit<ApiErrorOptions, 'status'> = {}): NextResponse<ApiError> {
     return apiError(message, {
         status: 401,
         code: options.code ?? ApiErrorCodes.UNAUTHORIZED,
@@ -118,10 +105,7 @@ export function apiUnauthorized(
 /**
  * 403 Forbidden
  */
-export function apiForbidden(
-    message: string = 'Access denied',
-    options: Omit<ApiErrorOptions, 'status'> = {}
-): NextResponse<ApiError> {
+export function apiForbidden(message: string = 'Access denied', options: Omit<ApiErrorOptions, 'status'> = {}): NextResponse<ApiError> {
     return apiError(message, {
         status: 403,
         code: options.code ?? ApiErrorCodes.FORBIDDEN,
@@ -132,10 +116,7 @@ export function apiForbidden(
 /**
  * 404 Not Found
  */
-export function apiNotFound(
-    message: string = 'Resource not found',
-    options: Omit<ApiErrorOptions, 'status'> = {}
-): NextResponse<ApiError> {
+export function apiNotFound(message: string = 'Resource not found', options: Omit<ApiErrorOptions, 'status'> = {}): NextResponse<ApiError> {
     return apiError(message, {
         status: 404,
         code: options.code ?? ApiErrorCodes.NOT_FOUND,
@@ -146,10 +127,7 @@ export function apiNotFound(
 /**
  * 409 Conflict
  */
-export function apiConflict(
-    message: string = 'Resource conflict',
-    options: Omit<ApiErrorOptions, 'status'> = {}
-): NextResponse<ApiError> {
+export function apiConflict(message: string = 'Resource conflict', options: Omit<ApiErrorOptions, 'status'> = {}): NextResponse<ApiError> {
     return apiError(message, {
         status: 409,
         code: options.code ?? ApiErrorCodes.CONFLICT,

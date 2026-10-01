@@ -1,0 +1,44 @@
+meta {
+  name: Write Tags - Delete Tags via Null
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/media/tags
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "path": "{{sampleAudioPath}}",
+    "tags": {
+      "Comment": null,
+      "Lyrics": null
+    },
+    "preserveOriginal": false
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.success: eq true
+}
+
+tests {
+  test("should delete tags with null values and return 200", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+  });
+}

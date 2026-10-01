@@ -1,0 +1,32 @@
+meta {
+  name: Stream Artwork - Missing Query Params (422)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/media/artwork
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 422
+  res.body.success: eq false
+  res.body.error.code: eq VALIDATION_ERROR
+}
+
+tests {
+  test("should reject missing file or path query param with 422", function() {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().success).to.be.false;
+  });
+}

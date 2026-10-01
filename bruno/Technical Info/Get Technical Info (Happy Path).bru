@@ -1,0 +1,41 @@
+meta {
+  name: Get Technical Info (Happy Path)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/media/technical?path={{sampleAudioPathFlac}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  path: {{sampleAudioPathFlac}}
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.codec: isDefined
+  res.body.data.sampleRate: isDefined
+  res.body.data.channels: isDefined
+  res.body.data.duration: isDefined
+}
+
+tests {
+  test("should return 200 with FFprobe technical specs", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.codec).to.be.a('string');
+    expect(res.getBody().data.sampleRate).to.be.a('number');
+  });
+}

@@ -1,0 +1,33 @@
+meta {
+  name: Get Single Metadata - Missing Path Param (422)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/media/metadata
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 422
+  res.body.success: eq false
+  res.body.error.code: eq VALIDATION_ERROR
+}
+
+tests {
+  test("should reject missing path query param with 422 validation error", function() {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().success).to.be.false;
+    expect(res.getBody().error.code).to.equal('VALIDATION_ERROR');
+  });
+}

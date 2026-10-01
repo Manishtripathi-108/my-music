@@ -1,0 +1,39 @@
+meta {
+  name: Batch Write Tags - Empty Targets (422)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/media/tags/batch
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "targets": []
+  }
+}
+
+assert {
+  res.status: eq 422
+  res.body.success: eq false
+  res.body.error.code: eq VALIDATION_ERROR
+}
+
+tests {
+  test("should reject empty targets array with 422", function() {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().success).to.be.false;
+  });
+}

@@ -1,0 +1,50 @@
+meta {
+  name: Write Tags - Single File (Happy Path)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/media/tags
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "path": "{{sampleAudioPath}}",
+    "tags": {
+      "Title": "Master of Puppets",
+      "Artist": "Metallica",
+      "Album": "Master of Puppets (Remastered)",
+      "Year": 1986,
+      "Genre": ["Heavy Metal", "Thrash Metal"],
+      "TrackNumber": 2
+    },
+    "preserveOriginal": false
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.success: eq true
+  res.body.data.updatedTags: isDefined
+}
+
+tests {
+  test("should write tags and return 200", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.success).to.be.true;
+  });
+}

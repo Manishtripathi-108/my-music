@@ -1,0 +1,44 @@
+meta {
+  name: Batch Inspect Metadata (Happy Path)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/media/metadata/batch
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "paths": [
+      "{{sampleAudioPath}}",
+      "{{sampleAudioPathFlac}}"
+    ]
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.total: isDefined
+  res.body.data.results: isDefined
+}
+
+tests {
+  test("should return 200 with batch metadata results", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.results).to.be.an('object');
+  });
+}

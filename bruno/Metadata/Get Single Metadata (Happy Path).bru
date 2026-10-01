@@ -1,0 +1,40 @@
+meta {
+  name: Get Single Metadata (Happy Path)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/media/metadata?path={{sampleAudioPathFlac}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  path: {{sampleAudioPathFlac}}
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.filePath: isDefined
+  res.body.data.tags: isDefined
+  res.body.data.technical: isDefined
+}
+
+tests {
+  test("should return 200 with audio metadata", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data).to.be.an('object');
+    expect(res.getBody().data.filePath).to.be.a('string');
+  });
+}

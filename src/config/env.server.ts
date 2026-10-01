@@ -9,7 +9,6 @@ const serverEnvSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
     EXIFTOOL_PATH: z.string().min(1).default('exiftool'),
-    FFMPEG_PATH: z.string().min(1).default('ffmpeg'),
     FFPROBE_PATH: z.string().min(1).default('ffprobe'),
     ART_CACHE_DIR: z.string().min(1).default('cache/art'),
 });

@@ -1,7 +1,7 @@
 meta {
-  name: Patch Tags - Single File (Happy Path)
+  name: Patch Tags - FLAC Vorbis Comments (200)
   type: http
-  seq: 10
+  seq: 1
 }
 
 patch {
@@ -10,20 +10,25 @@ patch {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{authToken}}
-}
-
 headers {
   Content-Type: application/json
   Accept: application/json
 }
 
+auth:bearer {
+  token: {{authToken}}
+}
+
 body:json {
   {
-    "path": "{{sampleAudioPath}}",
+    "path": "{{sampleAudioPathFlac}}",
     "tags": {
-      "Comment": "Production API Engineering Patch Test"
+      "Title": "Master of Puppets",
+      "Artist": "Metallica",
+      "Album": "Master of Puppets (Remastered)",
+      "Year": 1986,
+      "Genre": ["Heavy Metal", "Thrash Metal"],
+      "TrackNumber": 2
     },
     "preserveOriginal": false
   }
@@ -33,10 +38,11 @@ assert {
   res.status: eq 200
   res.body.success: eq true
   res.body.data.success: eq true
+  res.body.data.filePath: isDefined
 }
 
 tests {
-  test("should partially update tags via PATCH and return 200", function() {
+  test("should write tags and return 200", function() {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().success).to.be.true;
     expect(res.getBody().data.success).to.be.true;

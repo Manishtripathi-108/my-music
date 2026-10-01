@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import { type BatchMetadataResponse, type CombinedAudioMetadata, batchMetadataRequestSchema, singleMetadataQuerySchema } from '@/features/media';
+import { type CombinedAudioMetadata, singleMetadataQuerySchema } from '@/features/media';
 import { apiSuccess, handleRouteError } from '@/server/api';
-import { getMetadataCoordinator } from '@/server/media';
+import { getMetaReader } from '@/server/media';
 
 /* ----------------- Single Audio File Metadata Inspection ------------------ */
 
@@ -17,36 +17,9 @@ export async function GET(request: Request): Promise<NextResponse> {
             path: searchParams.get('path') ?? undefined,
         });
 
-        const metadata: CombinedAudioMetadata = await getMetadataCoordinator().readMetadata(path);
+        const metadata: CombinedAudioMetadata = await getMetaReader().read(path);
         return apiSuccess(metadata);
     } catch (error) {
         return handleRouteError(error, 'Failed to inspect audio metadata');
-    }
-}
-
-/* ------------------ Batch Audio File Metadata Inspection ------------------ */
-
-/**
- * POST /api/media/metadata
- * Body: { paths: string[] }
- * Batch inspects metadata for multiple audio files.
- */
-export async function POST(request: Request): Promise<NextResponse> {
-    try {
-        const body = await request.json();
-        const { paths } = batchMetadataRequestSchema.parse(body);
-
-        const metadataMap = await getMetadataCoordinator().readBatch(paths);
-        const results: Record<string, CombinedAudioMetadata> = Object.fromEntries(metadataMap);
-        const batchResponse: BatchMetadataResponse = {
-            total: metadataMap.size,
-            results,
-        };
-
-        return apiSuccess(batchResponse, {
-            message: `Processed metadata inspection for ${batchResponse.total} files`,
-        });
-    } catch (error) {
-        return handleRouteError(error, 'Failed to inspect audio metadata batch');
     }
 }

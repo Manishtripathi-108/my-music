@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 import { type ExtractedArtwork, artworkExtractRequestSchema, artworkQuerySchema } from '@/features/media';
 import { apiNotFound, apiSuccess, handleRouteError } from '@/server/api';
-import { getMetadataCoordinator } from '@/server/media';
+import { getMetaReader } from '@/server/media';
 
 /* ---------------------- Stream Artwork Binary (GET) ----------------------- */
 
@@ -24,7 +24,7 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
             file: searchParams.get('file') ?? undefined,
         });
 
-        const artwork: ExtractedArtwork | null = await getMetadataCoordinator().findArtwork(query);
+        const artwork: ExtractedArtwork | null = await getMetaReader().findArtwork(query);
 
         if (!artwork) {
             return apiNotFound('No album artwork available for the specified query');
@@ -61,7 +61,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         const body = await request.json();
         const input = artworkExtractRequestSchema.parse(body);
 
-        const artwork: ExtractedArtwork | null = await getMetadataCoordinator().extractArtwork(
+        const artwork: ExtractedArtwork | null = await getMetaReader().extractArtwork(
             input.path,
             input.forceRefresh
         );

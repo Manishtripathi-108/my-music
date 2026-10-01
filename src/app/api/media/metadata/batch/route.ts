@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { type BatchMetadataResponse, type CombinedAudioMetadata, batchMetadataRequestSchema } from '@/features/media';
 import { apiSuccess, handleRouteError } from '@/server/api';
-import { getMetadataCoordinator } from '@/server/media';
+import { getMetaReader } from '@/server/media';
 
 /* ------------------ Batch Audio File Metadata Inspection ------------------ */
 
@@ -16,7 +16,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         const body = await request.json();
         const { paths } = batchMetadataRequestSchema.parse(body);
 
-        const metadataMap = await getMetadataCoordinator().readBatch(paths);
+        const metadataMap = await getMetaReader().readBatch(paths);
         const results: Record<string, CombinedAudioMetadata> = Object.fromEntries(metadataMap);
         const batchResponse: BatchMetadataResponse = {
             total: metadataMap.size,

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { type AudioTags, type TagWriteResult, tagsQuerySchema, writeTagsRequestSchema } from '@/features/media';
 import { apiSuccess, handleRouteError } from '@/server/api';
-import { getExifClient, getMetadataCoordinator } from '@/server/media';
+import { getExifClient, getMetaReader } from '@/server/media';
 
 /* ----------------------- Read Audio File Tags (GET) ----------------------- */
 
@@ -17,7 +17,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             path: searchParams.get('path') ?? undefined,
         });
 
-        const metadata = await getMetadataCoordinator().readMetadata(path, {
+        const metadata = await getMetaReader().read(path, {
             extractArtwork: false,
             includeRawPayload: false,
         });
@@ -51,14 +51,4 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     } catch (error) {
         return handleRouteError(error, 'Failed to update metadata tags');
     }
-}
-
-/* --------------- Update Audio File Tags (POST Compatibility) -------------- */
-
-/**
- * POST /api/media/tags
- * Backward-compatible endpoint delegating to PATCH semantics.
- */
-export async function POST(request: Request): Promise<NextResponse> {
-    return PATCH(request);
 }

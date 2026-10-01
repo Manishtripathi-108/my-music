@@ -32,13 +32,3 @@ export async function PATCH(request: Request): Promise<NextResponse> {
         return handleRouteError(error, 'Failed to perform batch tag update');
     }
 }
-
-/* -------------- Batch File Tag Updating (POST Compatibility) -------------- */
-
-/**
- * POST /api/media/tags/batch
- * Backward-compatible endpoint delegating to PATCH semantics.
- */
-export async function POST(request: Request): Promise<NextResponse> {
-    return PATCH(request);
-}

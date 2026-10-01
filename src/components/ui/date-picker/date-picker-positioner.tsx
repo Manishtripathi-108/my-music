@@ -3,7 +3,7 @@
 import { DatePicker as ArkDatePicker } from '@ark-ui/react/date-picker';
 import { Portal } from '@ark-ui/react/portal';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type DatePickerPositionerProps = ArkDatePicker.PositionerProps;
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import { flushSync } from 'react-dom';
 
-import { isBrowser } from '@/lib/utils/core.utils';
+const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
 
 /* ---------------------------------- Types --------------------------------- */
 
@@ -510,33 +510,6 @@ const useTheme = ({ duration = 450, metaColor }: UseThemeOptions = {}): UseTheme
     };
 };
 
-/**
- * Inline script that runs before React hydrates.
- *
- * Prevents a flash of the wrong theme by applying the saved
- * mode to the page as soon as it loads. Place it in `<head>`.
- */
-export const ThemeScript = () => {
-    return (
-        <script
-            dangerouslySetInnerHTML={{
-                __html: `
-                    (function () {
-                        try {
-                            const mode = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_MODE}';
-                            const prefersDark = window.matchMedia('${DARK_QUERY}').matches;
-                            const activeTheme = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
-
-                            document.documentElement.setAttribute('data-theme', activeTheme);
-                            document.documentElement.classList.toggle('dark', activeTheme === 'dark');
-                        } catch (e) {
-                            console.error("Error applying theme:", e);
-                        }
-                    })();
-                `,
-            }}
-        />
-    );
-};
+export { ThemeScript } from '@/components/providers/ThemeScript';
 
 export default useTheme;

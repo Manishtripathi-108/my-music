@@ -2,7 +2,7 @@
 
 import { TreeView as ArkTreeView } from '@ark-ui/react/tree-view';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type TreeViewLabelProps = ArkTreeView.LabelProps;
 

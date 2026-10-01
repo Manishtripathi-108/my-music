@@ -2,8 +2,8 @@
 
 import { Checkbox as ArkCheckbox } from '@ark-ui/react/checkbox';
 
-import Icon from '@/components/ui/icon';
-import cn from '@/lib/utils/cn';
+import Icon from '@/components/ui/Icon';
+import cn from '@/lib/cn';
 
 export type CheckboxIndicatorProps = ArkCheckbox.IndicatorProps;
 

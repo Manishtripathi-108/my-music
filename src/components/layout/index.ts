@@ -1,1 +1,1 @@
-export { Topbar, type TopbarProps } from './topbar';
+export { Topbar, type TopbarProps } from './Topbar';

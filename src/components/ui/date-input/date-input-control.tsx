@@ -2,7 +2,7 @@
 
 import { DateInput as ArkDateInput } from '@ark-ui/react/date-input';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type DateInputControlProps = ArkDateInput.ControlProps;
 

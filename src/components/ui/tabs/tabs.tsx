@@ -4,7 +4,7 @@ import React from 'react';
 
 import { Tabs as ArkTabs } from '@ark-ui/react/tabs';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export interface TabsProps extends ArkTabs.RootProps {
     children?: React.ReactNode;

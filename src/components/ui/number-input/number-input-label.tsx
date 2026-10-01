@@ -2,7 +2,7 @@
 
 import { NumberInput as ArkNumberInput } from '@ark-ui/react/number-input';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type NumberInputLabelProps = ArkNumberInput.LabelProps;
 

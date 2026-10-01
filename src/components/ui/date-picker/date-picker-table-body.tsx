@@ -2,7 +2,7 @@
 
 import { DatePicker as ArkDatePicker } from '@ark-ui/react/date-picker';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type DatePickerTableBodyProps = ArkDatePicker.TableBodyProps;
 

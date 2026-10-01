@@ -1,5 +1,7 @@
-import clsx, { ClassValue } from 'clsx';
+import clsx, { type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+/* -------------------------- Class Name Merger ----------------------------- */
 
 /**
  * Combines class names with Tailwind CSS conflict resolution.

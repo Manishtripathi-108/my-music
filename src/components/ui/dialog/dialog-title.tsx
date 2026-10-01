@@ -2,7 +2,7 @@
 
 import { Dialog as ArkDialog } from '@ark-ui/react/dialog';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type DialogTitleProps = ArkDialog.TitleProps;
 

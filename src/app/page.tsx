@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react';
 
-import Topbar from '@/components/layout/topbar';
-import Badge from '@/components/ui/badge';
-import Button from '@/components/ui/button';
-import Icon from '@/components/ui/icon';
-import { ScanModal, useScanModalStore, type ScanResponseData } from '@/features/scanner';
+import Topbar from '@/components/layout/Topbar';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Icon from '@/components/ui/Icon';
+import { ScanModal, type ScanResponseData, useScanModalStore } from '@/features/scanner';
+import { formatTime } from '@/lib/format';
 
 export default function Home() {
     const { openModal: openScanModal } = useScanModalStore();
@@ -74,13 +75,7 @@ export default function Home() {
                                     </div>
                                 </div>
 
-                                <div className="text-muted-foreground text-xs">
-                                    {new Date(lastScan.timestamp).toLocaleTimeString([], {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        second: '2-digit',
-                                    })}
-                                </div>
+                                <div className="text-muted-foreground text-xs">{formatTime(lastScan.timestamp)}</div>
                             </div>
 
                             <div className="bg-background mt-4 grid grid-cols-1 gap-3 rounded-xl border p-4 text-xs sm:grid-cols-3">

@@ -2,12 +2,12 @@
 
 import React from 'react';
 
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Icon from '@/components/ui/Icon';
 import ThemeToggler from '@/components/ui/ThemeToggler';
-import Badge from '@/components/ui/badge';
-import Button from '@/components/ui/button';
-import Icon from '@/components/ui/icon';
 import { useScanModalStore } from '@/features/scanner';
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export interface TopbarProps extends React.ComponentProps<'header'> {
     /** Brand title displayed next to logo. Defaults to "My Music" */

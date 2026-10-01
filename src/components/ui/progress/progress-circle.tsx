@@ -4,7 +4,7 @@ import React from 'react';
 
 import { Progress as ArkProgress } from '@ark-ui/react/progress';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export interface ProgressCircleProps extends ArkProgress.CircleProps {
     size?: number | string;

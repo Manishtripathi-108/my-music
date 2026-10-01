@@ -2,8 +2,8 @@
 
 import { Field as ArkField } from '@ark-ui/react/field';
 
-import Icon from '@/components/ui/icon';
-import cn from '@/lib/utils/cn';
+import Icon from '@/components/ui/Icon';
+import cn from '@/lib/cn';
 
 export type FieldErrorTextProps = ArkField.ErrorTextProps;
 

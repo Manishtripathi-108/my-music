@@ -2,7 +2,7 @@
 
 import { Editable as ArkEditable } from '@ark-ui/react/editable';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type EditableLabelProps = ArkEditable.LabelProps;
 

@@ -3,7 +3,7 @@
 import { Dialog as ArkDialog } from '@ark-ui/react/dialog';
 import { Portal } from '@ark-ui/react/portal';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type DialogContentProps = ArkDialog.ContentProps;
 

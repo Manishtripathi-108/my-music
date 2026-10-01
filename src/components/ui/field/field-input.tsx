@@ -2,7 +2,7 @@
 
 import { Field as ArkField } from '@ark-ui/react/field';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type FieldInputProps = ArkField.InputProps;
 

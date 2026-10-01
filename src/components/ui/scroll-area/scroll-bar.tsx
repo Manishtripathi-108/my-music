@@ -2,7 +2,7 @@
 
 import { ScrollArea as ArkScrollArea } from '@ark-ui/react/scroll-area';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type ScrollBarProps = ArkScrollArea.ScrollbarProps;
 

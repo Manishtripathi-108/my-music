@@ -6,9 +6,7 @@
  * - When `success === false`: `ApiError` is returned with a standardized `error` object.
  */
 
-/* -------------------------------------------------------------------------- */
-/*  Standard Machine-Readable Error Codes                                     */
-/* -------------------------------------------------------------------------- */
+/* ----------------- Standard Machine-Readable Error Codes ------------------ */
 
 export const ApiErrorCodes = {
     // 400 Bad Request
@@ -47,9 +45,7 @@ export const ApiErrorCodes = {
 
 export type ApiErrorCode = (typeof ApiErrorCodes)[keyof typeof ApiErrorCodes] | (string & {});
 
-/* -------------------------------------------------------------------------- */
-/*  Metadata Structures                                                       */
-/* -------------------------------------------------------------------------- */
+/* -------------------------- Metadata Structures --------------------------- */
 
 export interface ApiPaginationMeta {
     page: number;
@@ -74,9 +70,7 @@ export interface ApiMeta {
     [key: string]: unknown;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Field-Level Validation Error Detail                                       */
-/* -------------------------------------------------------------------------- */
+/* ------------------ Field-Level Validation Error Detail ------------------- */
 
 export interface ApiFieldError {
     field: string;
@@ -84,9 +78,7 @@ export interface ApiFieldError {
     code?: string;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Error Response Structure                                                  */
-/* -------------------------------------------------------------------------- */
+/* ------------------------ Error Response Structure ------------------------ */
 
 export interface ApiErrorDetail {
     code: ApiErrorCode;
@@ -99,9 +91,7 @@ export interface ApiError {
     error: ApiErrorDetail;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Success Response Structure                                                */
-/* -------------------------------------------------------------------------- */
+/* ----------------------- Success Response Structure ----------------------- */
 
 export interface ApiSuccess<T> {
     success: true;
@@ -110,15 +100,11 @@ export interface ApiSuccess<T> {
     meta?: ApiMeta;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Root Discriminated Union                                                  */
-/* -------------------------------------------------------------------------- */
+/* ------------------------ Root Discriminated Union ------------------------ */
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;
 
-/* -------------------------------------------------------------------------- */
-/*  Type Guards                                                               */
-/* -------------------------------------------------------------------------- */
+/* ------------------------------ Type Guards ------------------------------- */
 
 export function isApiSuccess<T>(response: ApiResponse<T>): response is ApiSuccess<T> {
     return response.success === true;

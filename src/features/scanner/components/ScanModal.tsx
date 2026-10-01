@@ -1,22 +1,23 @@
 'use client';
 
+import { useEffect } from 'react';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import axios from 'axios';
 import { goeyToast } from 'goey-toast';
-import { useEffect } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 
-import Badge from '@/components/ui/badge';
-import Button from '@/components/ui/button';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 import { CheckboxControl, CheckboxHiddenInput, CheckboxLabel, CheckboxRoot } from '@/components/ui/checkbox';
 import { Dialog, DialogCloseTrigger, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Field, FieldErrorText, FieldHelperText, FieldInput, FieldLabel } from '@/components/ui/field';
-import Icon from '@/components/ui/icon';
+import Icon from '@/components/ui/Icon';
 import { RadioGroup, RadioGroupItem, RadioGroupItemControl, RadioGroupItemText, RadioGroupLabel } from '@/components/ui/radio-group';
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
+import type { ApiError, ApiErrorDetail, ApiFieldError, ApiSuccess } from '@/types/api';
 
-import type { ApiErrorDetail, ApiFieldError, ApiResponse } from '@/types/api';
-import { scanRequestSchema, type ScanMode, type ScanRequestInput } from '../schemas/scan-request.schema';
+import { type ScanMode, type ScanRequestInput, scanRequestSchema } from '../schemas/scan-request.schema';
 import { useScanModalStore } from '../stores/scan-modal.store';
 import type { ScanResponseData } from '../types';
 
@@ -54,7 +55,6 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
         handleSubmit,
         control,
         reset,
-        watch,
         setError,
         clearErrors,
         formState: { errors, isSubmitting },
@@ -67,7 +67,7 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
         },
     });
 
-    const recursiveValue = watch('recursive');
+    const recursiveValue = useWatch({ control, name: 'recursive' });
 
     // Clear server errors whenever the modal opens or closes
     useEffect(() => {
@@ -120,11 +120,10 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
         clearErrors();
 
         try {
-            const response = await axios.post<ApiResponse<ScanResponseData>>('/api/scan', values);
-            const result = response.data;
+            const response = await axios.post<ApiSuccess<ScanResponseData>>('/api/scan', values);
+            const { success, message, data } = response.data;
 
-            if (result.success) {
-                const data = result.data;
+            if (success) {
                 goeyToast.success('Library Scan Started', {
                     description: `Job ID: ${data.scanId} • Mode: ${data.scanMode}`,
                 });
@@ -137,15 +136,20 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
                 setModalOpen(false);
                 reset();
                 return;
+            } else {
+                // Handle unexpected success=false responses
+                const fallbackMessage = message || 'Scan request failed without a specific error message.';
+                setError('root.serverError', {
+                    type: 'server',
+                    message: fallbackMessage,
+                });
+                goeyToast.error('Scan Request Failed', { description: fallbackMessage });
             }
-
-            // Server returned 200 OK with error payload
-            handleApiError(result.error);
         } catch (error) {
-            if (axios.isAxiosError<ApiResponse<ScanResponseData>>(error) && error.response?.data) {
-                const errorPayload = error.response.data;
-                if (!errorPayload.success && errorPayload.error) {
-                    handleApiError(errorPayload.error);
+            if (axios.isAxiosError<ApiError>(error) && error.response?.data) {
+                const apiError = error.response.data;
+                if (apiError.error) {
+                    handleApiError(apiError.error);
                     return;
                 }
             }

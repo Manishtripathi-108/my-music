@@ -3,7 +3,7 @@ import { memo } from 'react';
 import { IconProps, Icon as Iconify } from '@iconify/react';
 
 import IconSet from '@/constants/icons.constants';
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type IconName = keyof typeof IconSet;
 

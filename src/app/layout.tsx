@@ -5,8 +5,8 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import 'goey-toast/styles.css';
 
 import '@/app/globals.css';
-import ToastProvider from '@/components/ui/ToastProvider';
-import { ThemeScript } from '@/hooks/useTheme';
+import ThemeScript from '@/components/providers/ThemeScript';
+import ToastProvider from '@/components/providers/ToastProvider';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',

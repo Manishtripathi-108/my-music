@@ -2,7 +2,7 @@
 
 import { RadioGroup as ArkRadioGroup } from '@ark-ui/react/radio-group';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type RadioGroupItemControlProps = ArkRadioGroup.ItemControlProps;
 

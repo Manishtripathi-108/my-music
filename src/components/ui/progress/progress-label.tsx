@@ -2,7 +2,7 @@
 
 import { Progress as ArkProgress } from '@ark-ui/react/progress';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type ProgressLabelProps = ArkProgress.LabelProps;
 

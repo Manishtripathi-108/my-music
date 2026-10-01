@@ -2,7 +2,7 @@
 
 import { TreeView as ArkTreeView } from '@ark-ui/react/tree-view';
 
-import Icon from '@/components/ui/icon';
+import Icon from '@/components/ui/Icon';
 
 import { TreeViewBranch } from './tree-view-branch';
 import { TreeViewBranchContent } from './tree-view-branch-content';

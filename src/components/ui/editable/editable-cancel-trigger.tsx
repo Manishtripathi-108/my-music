@@ -2,8 +2,8 @@
 
 import { Editable as ArkEditable } from '@ark-ui/react/editable';
 
-import Icon from '@/components/ui/icon';
-import cn from '@/lib/utils/cn';
+import Icon from '@/components/ui/Icon';
+import cn from '@/lib/cn';
 
 export type EditableCancelTriggerProps = ArkEditable.CancelTriggerProps;
 

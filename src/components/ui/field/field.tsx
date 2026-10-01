@@ -2,7 +2,7 @@
 
 import { Field as ArkField } from '@ark-ui/react/field';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type FieldProps = ArkField.RootProps;
 

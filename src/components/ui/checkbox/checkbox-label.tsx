@@ -2,7 +2,7 @@
 
 import { Checkbox as ArkCheckbox } from '@ark-ui/react/checkbox';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type CheckboxLabelProps = ArkCheckbox.LabelProps;
 

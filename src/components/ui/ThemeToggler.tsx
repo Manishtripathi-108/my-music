@@ -1,10 +1,10 @@
 'use client';
 
-import Icon from '@/components/ui/icon';
+import Icon from '@/components/ui/Icon';
 import useTheme from '@/hooks/useTheme';
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
-import { Button } from './button';
+import { Button } from './Button';
 
 export function ThemeToggler({ className, ...props }: React.ComponentProps<'div'>) {
     const { mode, nextMode, cycleModeAnimated } = useTheme();

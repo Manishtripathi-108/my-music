@@ -2,7 +2,7 @@
 
 import { Steps as ArkSteps } from '@ark-ui/react/steps';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type StepsTriggerProps = ArkSteps.TriggerProps;
 

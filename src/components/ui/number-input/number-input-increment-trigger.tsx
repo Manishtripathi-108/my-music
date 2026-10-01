@@ -2,8 +2,8 @@
 
 import { NumberInput as ArkNumberInput } from '@ark-ui/react/number-input';
 
-import Icon from '@/components/ui/icon';
-import cn from '@/lib/utils/cn';
+import Icon from '@/components/ui/Icon';
+import cn from '@/lib/cn';
 
 export type NumberInputIncrementTriggerProps = ArkNumberInput.IncrementTriggerProps;
 

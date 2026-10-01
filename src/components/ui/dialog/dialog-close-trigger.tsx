@@ -2,8 +2,8 @@
 
 import { Dialog as ArkDialog } from '@ark-ui/react/dialog';
 
-import Icon from '@/components/ui/icon';
-import cn from '@/lib/utils/cn';
+import Icon from '@/components/ui/Icon';
+import cn from '@/lib/cn';
 
 export type DialogCloseTriggerProps = ArkDialog.CloseTriggerProps;
 

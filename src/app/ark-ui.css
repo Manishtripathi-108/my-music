@@ -1,9 +1,6 @@
 /* Ark UI — Custom Variants & Shared Interaction Styles */
 
-/* -------------------------------------------------------------------------- */
-/*  1. State variants                                                         */
-/*     Ark UI uses `data-state` for open/closed, checked/unchecked, etc.      */
-/* -------------------------------------------------------------------------- */
+/* ----------------------------- State Variants ----------------------------- */
 
 @custom-variant ark-open (&[data-state="open"]);
 @custom-variant ark-closed (&[data-state="closed"]);
@@ -14,10 +11,7 @@
 @custom-variant ark-incomplete (&[data-state="incomplete"]);
 @custom-variant ark-current (&[data-current], &[data-state="current"]);
 
-/* -------------------------------------------------------------------------- */
-/*  2. Boolean presence variants                                              */
-/*     Ark UI sets these as bare attributes (no value) when active.           */
-/* -------------------------------------------------------------------------- */
+/* ----------------------- Boolean Presence Variants ------------------------ */
 
 @custom-variant ark-disabled (&[data-disabled]);
 @custom-variant ark-invalid (&[data-invalid]);
@@ -40,18 +34,12 @@
 @custom-variant ark-outside-range (&[data-outside-range]);
 @custom-variant ark-unavailable (&[data-unavailable]);
 
-/* -------------------------------------------------------------------------- */
-/*  3. Orientation variants                                                   */
-/*     Tabs, RadioGroup, Accordion, Slider, Progress, etc.                    */
-/* -------------------------------------------------------------------------- */
+/* -------------------------- Orientation Variants -------------------------- */
 
 @custom-variant ark-horizontal (&[data-orientation="horizontal"]);
 @custom-variant ark-vertical (&[data-orientation="vertical"]);
 
-/* -------------------------------------------------------------------------- */
-/*  4. Placement / side variants                                              */
-/*     Menu, Popover, Tooltip, Select positioners.                            */
-/* -------------------------------------------------------------------------- */
+/* ----------------------- Placement & Side Variants ------------------------ */
 
 @custom-variant ark-top (&[data-side="top"]);
 @custom-variant ark-bottom (&[data-side="bottom"]);
@@ -62,10 +50,7 @@
 @custom-variant ark-swipe-up (&[data-swipe-direction="up"], &[data-swipe-direction="top"]);
 @custom-variant ark-swipe-down (&[data-swipe-direction="down"], &[data-swipe-direction="bottom"]);
 
-/* -------------------------------------------------------------------------- */
-/*  5. Group variants (parent → child)                                        */
-/*     Style children based on their Ark UI parent's state.                   */
-/* -------------------------------------------------------------------------- */
+/* ----------------------------- Group Variants ----------------------------- */
 
 @custom-variant ark-group-open {
     :where([data-state='open']) & {
@@ -121,10 +106,7 @@
     }
 }
 
-/* -------------------------------------------------------------------------- */
-/*  6. ScrollArea viewport                                                    */
-/*     Hide native scrollbars so only the Ark UI custom scrollbar shows.      */
-/* -------------------------------------------------------------------------- */
+/* -------------------------- ScrollArea Viewport --------------------------- */
 
 @layer base {
     [data-scope='scroll-area'][data-part='viewport'] {
@@ -136,4 +118,3 @@
         }
     }
 }
-

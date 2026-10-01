@@ -4,7 +4,7 @@ import React from 'react';
 
 import { Steps as ArkSteps } from '@ark-ui/react/steps';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export interface StepsProps extends ArkSteps.RootProps {
     children?: React.ReactNode;

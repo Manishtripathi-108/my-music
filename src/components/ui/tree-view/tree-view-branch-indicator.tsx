@@ -2,8 +2,8 @@
 
 import { TreeView as ArkTreeView } from '@ark-ui/react/tree-view';
 
-import Icon from '@/components/ui/icon';
-import cn from '@/lib/utils/cn';
+import Icon from '@/components/ui/Icon';
+import cn from '@/lib/cn';
 
 export type TreeViewBranchIndicatorProps = ArkTreeView.BranchIndicatorProps;
 

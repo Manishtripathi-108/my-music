@@ -18,3 +18,6 @@ export {
     type ApiSuccessOptions,
     type ApiErrorOptions,
 } from './response';
+
+export { handleRouteError } from './error-handler';
+export { NotFoundError, BadRequestError, ConflictError } from './errors';

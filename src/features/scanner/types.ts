@@ -1,4 +1,5 @@
 import type { ApiResponse } from '@/types/api';
+
 import type { ScanMode } from './schemas/scan-request.schema';
 
 export type ScanResponseData = {

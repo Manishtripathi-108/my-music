@@ -26,6 +26,7 @@ This file defines where code lives. Follow it unless the user explicitly asks fo
 8. **Reuse before creating.** Search for an existing module first. No empty folders, no speculative abstractions, no new pattern for a single task.
 9. **No unrelated moves or renames** during a feature task.
 10. **Verify Next.js APIs against `node_modules/next/dist/docs/`**, not memory (routing files, request APIs, caching, and config may have changed).
+11. **Strict 80-character section divider comments.** To differentiate code blocks, use single-line `/* --------------------- Title --------------------- */` comments of EXACTLY 80 characters (no more, no less). Maintain JSDoc comments (`/** ... */`) above functions, routes, and types. Never use 3-line banners like `# ==========================================` or multi-line comment boxes.
 
 ## Folder structure
 
@@ -66,7 +67,7 @@ project-root/
 │   │   ├── layout/               # header, footer, sidebar, mobile-nav
 │   │   └── providers/            # generic providers: theme, query
 │   │
-│   ├── hooks/                    # shared client hooks: use-debounce, use-media-query
+│   ├── hooks/                    # shared client hooks: useDebounce, useMediaQuery
 │   ├── lib/                      # generic isomorphic utilities: cn, format-date, logger
 │   │
 │   ├── server/                   # SHARED SERVER INFRASTRUCTURE (server-only)
@@ -263,42 +264,124 @@ Frontend logic must inspect `error.code` rather than parsing human-readable mess
 
 - In production (`process.env.NODE_ENV === 'production'`), `apiInternalError()` logs full error traces on the server but returns only a generic, safe error message to the client. Stack traces, file paths, database queries, and environment details must NEVER reach the response body.
 
-### Route handler template
+### Commenting and code division standards
+
+- **Strict 80-Character Section Dividers**:
+  - To visually differentiate between logical code sections or blocks in source files, use single-line divider comments formatted as:
+    `/* --------------------- Section Title --------------------- */`
+  - The total length of the comment line MUST ALWAYS be **EXACTLY 80 characters** — no more, no less.
+  - Dashes are distributed symmetrically around the title with single spaces separating the dashes and text.
+  - Never use multi-line decorative block banners such as:
+    ```
+    # ==========================================
+    # Media Processing Tool Binaries
+    # ==========================================
+    ```
+    or multi-line `/* ------- */` boxes.
+- **Maintain JSDoc Comments**:
+  - Always maintain standard JSDoc block comments (`/** ... */`) above functions, classes, interfaces, types, and route handlers. JSDoc is for documenting contracts, params, and behavior; the 80-character divider comment is used solely to separate distinct sections of code.
+
+### API creation standard & route handler template
+
+Every Route Handler (`src/app/api/**/route.ts`) must:
+1. Include JSDoc comments directly above each exported HTTP method documenting the route, method, params, and behavior.
+2. Parse request payloads directly using `schema.parse(body)` (or query parameters schema).
+3. Delegate all error formatting to `handleRouteError(error, fallbackMessage)`. Do not repeat manual `safeParse`, `apiValidationError`, or nested try/catch blocks in route handlers.
+4. Return standardized `ApiResponse<T>` envelopes via `apiSuccess`, `apiCreated`, or `apiAccepted`.
 
 ```ts
 import { NextResponse } from 'next/server';
-import { apiAccepted, apiBadRequest, apiInternalError, apiValidationError } from '@/server/api';
+import { apiAccepted, handleRouteError } from '@/server/api';
 import { myRequestSchema, type MyResponse } from '@/features/my-feature';
+import { getMyService } from '@/features/my-feature/server';
 
+/**
+ * POST /api/my-task
+ * Body: MyRequest
+ * Queues a task for asynchronous processing.
+ */
 export async function POST(request: Request): Promise<NextResponse<MyResponse>> {
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return apiBadRequest('Malformed JSON body', { code: 'MALFORMED_JSON' });
-  }
+    const body = await request.json();
+    const data = myRequestSchema.parse(body);
 
-  const parseResult = myRequestSchema.safeParse(body);
-  if (!parseResult.success) {
-    return apiValidationError(parseResult.error.issues);
-  }
-
-  try {
-    const result = await processTask(parseResult.data);
+    const result = await getMyService().processTask(data);
     return apiAccepted(result, { message: 'Task queued successfully' });
   } catch (error) {
-    return apiInternalError(error, 'Failed to process task');
+    return handleRouteError(error, 'Failed to process task');
   }
 }
 ```
 
-## Naming
+## Naming and Code Clarity
 
-- Folders and files: `kebab-case` (`user-card.tsx`, `create-order.ts`, `use-theme.ts`).
-- Components and types: `PascalCase`. Functions and variables: `camelCase`. True constants: `UPPER_SNAKE_CASE` when it matches existing style.
-- Actions and queries: verb-noun (`create-order.ts`, `list-orders.ts`).
-- Next.js special files keep their required names (`page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, `route.ts`).
-- Unit and component tests sit beside the source (`order-service.test.ts`). Full flows go in `e2e/*.spec.ts`.
+### File and casing conventions
+
+- **React Components**: Use `PascalCase` filenames matching the component name for standalone components, such as `Button.tsx`, `Badge.tsx`, `ThemeToggle.tsx`, `Topbar.tsx`, and `ScanModal.tsx`.
+- **Complex / Multi-file Components**: Use a kebab-case folder with kebab-case internal files, such as `checkbox/checkbox.tsx`, `checkbox/checkbox-control.tsx`, `checkbox/checkbox-label.tsx`, and `checkbox/checkbox-root.tsx`.
+- **Hooks**: Use `camelCase` filenames prefixed with `use`, such as `useTheme.ts` and `useAudioPlayer.ts`.
+- **File Extensions**: Use `.tsx` only when the file contains JSX. Hooks, utilities, services, and other files without JSX must use `.ts`.
+- **Strict Consistency**: Keep naming consistent throughout the project. Never mix `useTheme.ts` with `use-theme.ts`, or `Button.tsx` with `button.tsx`.
+- **Non-Component Modules**: Use `kebab-case` for services, schemas, actions, queries, types, and generic technical libraries, such as `media.service.ts`, `scan-request.schema.ts`, `format.ts`, and `cn.ts`.
+- **Next.js Special Files**: Retain framework-mandated lowercase names, such as `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, and `route.ts`.
+- **Type Names**: Use `PascalCase`. **Functions and variables**: use `camelCase`. **True constants**: use `UPPER_SNAKE_CASE` when matching existing project style.
+- **Actions and Queries**: Use verb-noun names, such as `create-order.ts` and `list-orders.ts`.
+- **Tests**: Keep unit and component tests beside the source, such as `order-service.test.ts`. Full flows go in `e2e/*.spec.ts`.
+
+### Identifier naming principles
+
+- Choose the shortest name that clearly explains the role or purpose.
+- A name should describe what something represents or does, not how it is implemented.
+- Avoid vague abbreviations such as `seq`, `ctx`, `obj`, `data`, `res`, `req`, `item`, `tmp`, `val`, or `info` when a clearer short name is available.
+- Prefer meaningful short names such as `requestId`, `currentRequest`, `toolProcess`, `outputBuffer`, `filePath`, `tagMap`, `result`, or `options`.
+- Avoid unnecessarily long names. Add words only when they remove ambiguity.
+- Keep naming consistent across the file and project. Use the same vocabulary for related concepts.
+- Prefer nouns for stored values and state, and verbs for functions that perform actions.
+- Boolean names should read as a yes/no condition, such as `isClosing`, `hasError`, `shouldRetry`, or `includeArtwork`.
+- Functions should clearly describe their action, such as `runNext()`, `parseOutput()`, `handleCrash()`, or `ensureProcess()`.
+- Avoid abbreviations unless they are universally understood in the domain, such as `URL`, `API`, `ID`, `HTTP`, `JSON`, or `UTF8`.
+
+### Naming decision rule
+
+Before choosing a name, ask:
+
+1. What does this represent?
+2. What role does it play?
+3. Can that meaning be expressed in fewer words?
+4. Would another developer understand it without reading the implementation?
+
+Choose the shortest name that passes all four checks.
+
+### Comments
+
+- Add small, meaningful comments only where they clarify non-obvious intent, logic, protocol behavior, constraints, or important decisions.
+- Do not comment obvious code or describe what the code already clearly says.
+- Do not use comments to compensate for poor naming. Improve the name instead.
+- Keep comments short, professional, and focused.
+- Do not bloat files with comments on every line or block.
+
+### Refactoring existing names
+
+When improving code, actively review existing names and replace vague names when their intent is unclear.
+
+| Vague | Preferred |
+| --- | --- |
+| `seq` | `requestId` |
+| `active` | `currentRequest` |
+| `child` | `toolProcess` |
+| `proc` | `toolProcess` |
+| `stdoutBuffer` | `outputBuffer` |
+| `drain()` | `runNext()` |
+| `req` | `request` |
+| `val` | `value` |
+| `err` | `error` |
+| `res` | `response` or `result` |
+
+Do not blindly apply these replacements. Choose names based on the actual responsibility in context.
+
+### Persistence
+
+When these naming, formatting, or comment rules are introduced or changed, update the project's `AGENTS.md` or equivalent agent instruction file so they are preserved and followed in future work.
 
 ## Scaling triggers
 

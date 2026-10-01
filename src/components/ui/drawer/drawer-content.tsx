@@ -2,7 +2,7 @@
 
 import { Drawer as ArkDrawer } from '@ark-ui/react/drawer';
 
-import cn from '@/lib/utils/cn';
+import cn from '@/lib/cn';
 
 export type DrawerContentProps = ArkDrawer.ContentProps;
 

@@ -1,10 +1,10 @@
 enum IconSet {
-    /* ------------------------------------ Theme ----------------------------------- */
+    /* --------------------------------- Theme ---------------------------------- */
     sun = 'solar:sun-bold',
     moon = 'solar:moon-stars-bold',
     desktop = 'solar:monitor-bold',
 
-    /* ------------------------------ Shapes (Transition) --------------------------- */
+    /* -------------------------- Shapes (Transition) --------------------------- */
     shapeCircle = 'solar:record-bold',
     shapeDiamond = 'solar:compass-big-bold',
     shapeSquare = 'solar:stop-bold',
@@ -15,7 +15,7 @@ enum IconSet {
     shapeWipeRight = 'solar:arrow-right-bold',
     shapeWipeLeft = 'solar:arrow-left-bold',
 
-    /* --------------------------------- Media & Audio ------------------------------ */
+    /* ----------------------------- Media & Audio ------------------------------ */
     audio = 'solar:headphones-round-bold',
     musicNote = 'solar:music-note-bold',
     musicNotes = 'solar:music-notes-bold',
@@ -32,7 +32,7 @@ enum IconSet {
     volumeMute = 'solar:volume-cross-bold',
     volumeLow = 'solar:volume-small-bold',
 
-    /* ---------------------------- Navigation & Controls --------------------------- */
+    /* ------------------------- Navigation & Controls -------------------------- */
     close = 'solar:close-bold',
     closeCircle = 'solar:close-circle-bold',
     check = 'solar:check-bold',
@@ -45,7 +45,7 @@ enum IconSet {
     chevronLeft = 'solar:alt-arrow-left-outline',
     chevronRight = 'solar:alt-arrow-right-outline',
 
-    /* --------------------------------- Form & State ------------------------------- */
+    /* ------------------------------ Form & State ------------------------------ */
     loading = 'svg-spinners:tadpole',
     sparkles = 'solar:stars-minimalistic-bold',
     alert = 'solar:danger-triangle-bold',
@@ -65,7 +65,7 @@ enum IconSet {
     download = 'solar:download-bold',
     upload = 'solar:upload-bold',
 
-    /* ------------------------------- Files & Folders ------------------------------ */
+    /* ---------------------------- Files & Folders ----------------------------- */
     folder = 'solar:folder-bold',
     folderOpen = 'solar:folder-open-bold',
     folderWithFiles = 'solar:folder-with-files-bold',

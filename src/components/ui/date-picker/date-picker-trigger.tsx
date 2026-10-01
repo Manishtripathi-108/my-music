@@ -2,8 +2,8 @@
 
 import { DatePicker as ArkDatePicker } from '@ark-ui/react/date-picker';
 
-import Icon from '@/components/ui/icon';
-import cn from '@/lib/utils/cn';
+import Icon from '@/components/ui/Icon';
+import cn from '@/lib/cn';
 
 export type DatePickerTriggerProps = ArkDatePicker.TriggerProps;
 

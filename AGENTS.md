@@ -21,7 +21,7 @@ This file defines where code lives. Follow it unless the user explicitly asks fo
 3. **Business code lives in `src/features/<feature>`.** Never in `components/`, `hooks/`, `lib/`, or `types/`.
 4. **Shared technical infrastructure lives in `src/server` (server-only) or `src/lib` (isomorphic).** Never inside a feature.
 5. **Server Components by default.** Add `"use client"` only for state, effects, browser APIs, or event handlers, and only on the smallest leaf component.
-6. **Server-only code never reaches the client bundle.** Every server-only module starts with `import "server-only"`.
+6. **Server-only code never reaches the client bundle.** Every server-only module starts with `import "server-only"` (pure type-only files are exempt since types are erased at compile time).
 7. **The server enforces validation and authorization.** UI checks are presentation only.
 8. **Reuse before creating.** Search for an existing module first. No empty folders, no speculative abstractions, no new pattern for a single task.
 9. **No unrelated moves or renames** during a feature task.
@@ -164,7 +164,7 @@ Public API of a feature:
 ## Server / client boundary
 
 - Keep `"use client"` at the leaf. Pass server-rendered content down as `children` or props. Props crossing the boundary must be serializable.
-- `import "server-only"` is required in: `src/server/**`, `features/*/{queries,services,repositories}/**`, every `server.ts`, `config/env.server.ts`.
+- `import "server-only"` is required in: `src/server/**`, `features/*/{queries,services,repositories}/**`, every `server.ts`, `config/env.server.ts`. Pure type-only files (`types.ts` or files containing only TypeScript types/interfaces) are exempt since types emit no JavaScript runtime code.
 - Environment: `config/env.server.ts` (server-only, validated) and `config/env.client.ts` (`NEXT_PUBLIC_*` only). Never read `process.env` anywhere else.
 - Client writes go through Server Actions. Use Route Handlers only when a real HTTP endpoint is needed (webhooks, third-party or mobile clients). Never call your own API routes from server code.
 - Prefer server state and URL state (search params). Use client state libraries only for genuinely shared client state. Do not mirror server data into client stores.
@@ -175,6 +175,18 @@ Public API of a feature:
 - Server Actions and Route Handlers are public endpoints. Each one authenticates and authorizes on its own; never assume the page already did.
 - Domain permission rules live in the owning feature, not in buttons or pages.
 - Return only the fields the client needs. Never pass secrets, internal IDs, or full DB rows to Client Components.
+
+## Server error handling and propagation
+
+- **Never return or pass errors as strings anywhere in server code**:
+  - Do not use return shapes like `{ success: false, error: "message" }` or string error values as an error-propagation mechanism between functions, classes, or architecture layers.
+  - Always **throw or reject proper `Error` instances** (or typed domain error classes such as `NotFoundError`, `BadRequestError`, or `ConflictError`).
+- **Central API error translation**:
+  - Route handlers must never manually inspect `if (!result.success)` on server calls. Allow errors to bubble or catch them only at the HTTP boundary to delegate directly to `handleRouteError(error, fallbackMessage)`.
+  - The central error handler inspects error instances and messages, automatically mapping domain errors, Zod validation issues, syntax errors, and unexpected exceptions into standard `ApiResponse<T>` envelopes with the appropriate HTTP status codes.
+- **Universal Scope**:
+  - This rule applies strictly across services, clients (e.g., `ExifClient`, `AudioProber`, `MetaReader`), repositories, utilities, and API route handlers.
+  - Enforce this convention in all future server code, refactors, and feature additions without exception.
 
 ## Routes and API handlers
 
@@ -213,6 +225,18 @@ type ApiError = {
 // Root Discriminated Union
 type ApiResponse<T> = ApiSuccess<T> | ApiError;
 ```
+
+### Production HTTP method selection & resource routing
+
+- **Identify the actual operation first**: Do not use `POST` for every endpoint by default. Choose standard HTTP semantics matching the operation:
+  - **`GET`**: Reading resources or retrieving data (idempotent, safe, cacheable).
+  - **`POST`**: Creating new resources, non-CRUD operations, or submitting large payload batches (e.g. array of paths) for server-side processing.
+  - **`PUT`**: Complete replacement of a resource (idempotent).
+  - **`PATCH`**: Partial update of an existing resource, modifying only the fields supplied by the client (e.g., updating specific audio tags).
+  - **`DELETE`**: Removing resources (never use GET or POST for deletion).
+- **Resource-Oriented URLs**: Prefer resource URLs (`PATCH /api/media/tags`) over action-based URLs (`/api/media/tags/update`). Use action endpoints only when an operation is genuinely an action (`POST /api/scan`).
+- **Binary and Streaming Delivery**: For binary payloads (such as album artwork or audio files), stream directly via web `ReadableStream` (`Readable.toWeb(nodeStream)`) with appropriate caching headers (`Cache-Control: public, max-age=31536000, immutable`), `Content-Type`, and `Content-Length`. Never buffer entire files in Node.js memory.
+- **Strict Canonical REST (No Backward-Compatibility Bloat)**: Do not export redundant delegating handlers (such as a POST fallback for a PATCH or GET endpoint). Use strictly the canonical HTTP method for each operation without legacy method aliasing.
 
 ### HTTP status code rules
 

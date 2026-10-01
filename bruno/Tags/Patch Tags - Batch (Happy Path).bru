@@ -1,0 +1,48 @@
+meta {
+  name: Patch Tags - Batch (Happy Path)
+  type: http
+  seq: 11
+}
+
+patch {
+  url: {{baseUrl}}/api/media/tags/batch
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "targets": [
+      {
+        "path": "{{sampleAudioPath}}",
+        "tags": {
+          "Comment": "Batch PATCH Test"
+        }
+      }
+    ],
+    "preserveOriginal": false
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.total: eq 1
+}
+
+tests {
+  test("should batch update tags via PATCH and return 200", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.succeeded).to.be.an('array');
+  });
+}

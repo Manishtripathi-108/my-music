@@ -71,20 +71,17 @@ flowchart TD
 
     subgraph FeatureLayer["Feature Domain (src/features/media)"]
         ZodSchemas["Zod Schemas\n(metadata, technical, tags, artwork)"]
-        MediaService["MediaService (Singleton)\n- Input Validation & Normalization\n- Path Traversal Hardening\n- Domain Error Mapping"]
     end
 
     subgraph ServerLayer["Server Infrastructure (src/server/media) - server-only"]
-        Coordinator["MetadataCoordinator\n- Parallel Inspection Orchestration\n- Heterogeneous Tag Normalizer"]
-        ExifClient["ExifClient (Stay-Open Daemon)\n- FIFO Command Queue\n- C-String Arg Escaping\n- Ready Marker & Status Parser\n- Process Crash Recovery"]
-        AudioProber["AudioProber\n- FFprobe JSON Stream Inspector\n- Lossless Codec Matrix (Set)\n- Bounded-Concurrency Worker Pool"]
-        ArtExtractor["ArtExtractor\n- SHA-256 Content Keying\n- Primary: FFmpeg Direct Stream Copy\n- Fallback: ExifTool Binary Stream\n- Magic Byte Format Sniffer"]
+        Coordinator["MetadataCoordinator\n- Parallel Inspection Orchestration\n- Tag Normalizer & Artwork Cache\n- In-Flight Extraction Deduplication"]
+        ExifClient["ExifClient (Stay-Open Daemon)\n- FIFO Command Queue & Protocol Parser\n- Metadata Reads & Atomic Tag Writes\n- Binary Artwork Extraction (-b -Tag -W!)\n- Process Lifecycle & Crash Recovery"]
+        AudioProber["AudioProber (Stateless)\n- FFprobe JSON Stream Inspector\n- Lossless Codec Matrix & Attached Picture Detection\n- Bounded-Concurrency Worker Pool"]
     end
 
     subgraph ExternalLayer["OS & External Runtime"]
         ExifToolBin["ExifTool Process\n(-stay_open True -@ -)"]
         FFprobeBin["FFprobe CLI"]
-        FFmpegBin["FFmpeg CLI"]
         DiskCache["Disk Cache\n(cache/art/*.jpg|png|webp|gif)"]
         AudioFiles["Audio Filesystem\n(FLAC, ALAC, MP3, AAC, OGG, WAV)"]
     end
@@ -92,28 +89,19 @@ flowchart TD
     UI --> RouteLayer
     API_Client --> RouteLayer
 
-    R_Meta --> ZodSchemas --> MediaService
-    R_Tech --> ZodSchemas --> MediaService
-    R_Tags --> ZodSchemas --> MediaService
-    R_Art --> ZodSchemas --> MediaService
-
-    MediaService --> Coordinator
-    MediaService --> ExifClient
-    MediaService --> AudioProber
-    MediaService --> ArtExtractor
+    R_Meta --> ZodSchemas --> Coordinator
+    R_Tech --> ZodSchemas --> AudioProber
+    R_Tags --> ZodSchemas --> ExifClient
+    R_Art --> ZodSchemas --> Coordinator
 
     Coordinator --> ExifClient
     Coordinator --> AudioProber
-    Coordinator --> ArtExtractor
+    Coordinator <--> DiskCache
 
     ExifClient <-->|IPC stdio pipe| ExifToolBin
     AudioProber -->|execFile JSON| FFprobeBin
-    ArtExtractor -->|spawn stream copy| FFmpegBin
-    ArtExtractor -->|spawn binary tag| ExifToolBin
-    ArtExtractor <--> DiskCache
     ExifToolBin <--> AudioFiles
     FFprobeBin <--> AudioFiles
-    FFmpegBin <--> AudioFiles
 ```
 
 ---
@@ -122,17 +110,15 @@ flowchart TD
 
 | Component | Location | Primary Responsibilities & Design Patterns |
 | :--- | :--- | :--- |
-| **`MediaService`** | `src/features/media/services/media.service.ts` | **Domain Gateway & Facade**: Validates file existence on disk (`fs.existsSync`), throws strongly typed `NotFoundError`, sanitizes artwork file queries (`path.basename`) against directory traversal attacks, and routes calls to server singletons. |
-| **`MetadataCoordinator`** | `src/server/media/metadata/coordinator.ts` | **Multi-Source Orchestrator**: Executes `AudioProber`, `ExifClient`, and `ArtExtractor` in parallel via `Promise.all`. Normalizes conflicting tags across ID3v1, ID3v2.3, ID3v2.4, Vorbis Comments, QuickTime MP4 atoms, and RIFF INFO chunks into a unified `AudioTags` contract. |
-| **`ExifClient`** | `src/server/media/exif/client.ts` | **Persistent Process Daemon**: Maintains a single long-lived ExifTool process using `-stay_open True -@ -`. Eliminates ~235ms Perl startup overhead per call. Implements a thread-safe FIFO command queue, C-string argument encoding (`#[CSTR]`), output byte monitoring, process crash auto-restarts, and atomic tag writing. |
-| **`AudioProber`** | `src/server/media/ffprobe/reader.ts` | **Stream Specification Engine**: Spawns `ffprobe` to extract audio technical metrics. Evaluates audio streams against a registry of 20+ lossless codecs, checks bit depth, sample rates, duration, and channel layouts. Provides bounded-concurrency worker pools (default: 8 concurrent workers) for batch probing. |
-| **`ArtExtractor`** | `src/server/media/artwork/extractor.ts` | **Dual-Stage Image Pipeline**: Extracts cover art using content-addressed SHA-256 cache keys. Primary extraction uses FFmpeg direct stream copy (`-vcodec copy`, avoiding re-encoding). Secondary fallback queries ExifTool binary picture tags (`-Picture`, `-CoverArt`, etc.). Sniffs format using magic bytes and persists images to `cache/art`. |
+| **`MetadataCoordinator`** | `src/server/media/metadata/coordinator.ts` | **Multi-Source Orchestrator**: Executes `AudioProber` and `ExifClient` concurrently via `Promise.all`. Normalizes conflicting tags into unified `AudioTags`. Manages disk artwork caching (`cache/art`), in-flight extraction request deduplication, and magic-byte format validation. |
+| **`ExifClient`** | `src/server/media/exif/client.ts` | **Persistent Process Daemon**: Maintains a single long-lived ExifTool process using `-stay_open True -@ -`. Eliminates ~235ms Perl startup overhead per call. Implements FIFO command queue, atomic tag writing with optional backups, crash auto-recovery, and direct binary artwork extraction (`-b -Tag -W!`). |
+| **`AudioProber`** | `src/server/media/ffprobe/reader.ts` | **Stream Specification Engine**: Direct-instantiation client that executes `ffprobe` to extract audio technical metrics. Evaluates audio streams against lossless codecs, checks bit depth, sample rates, duration, attached-picture disposition, and provides bounded concurrency worker pools. |
 
 ---
 
 ### 1. Unified Metadata Inspection Execution Flow
 
-The primary read flow orchestrates `FFprobe`, `ExifTool`, and `ArtExtractor` concurrently to return a rich `CombinedAudioMetadata` object.
+The primary read flow orchestrates `FFprobe` and `ExifTool` concurrently to return a rich `CombinedAudioMetadata` object.
 
 ```mermaid
 sequenceDiagram

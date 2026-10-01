@@ -1,0 +1,38 @@
+meta {
+  name: Get Audio Tags (Happy Path)
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/media/tags?path={{sampleAudioPathFlac}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  path: {{sampleAudioPathFlac}}
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.title: isDefined
+  res.body.data.artist: isDefined
+}
+
+tests {
+  test("should retrieve audio tags and return 200", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data).to.be.an('object');
+  });
+}

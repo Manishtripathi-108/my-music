@@ -10,13 +10,13 @@ post {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{authToken}}
-}
-
 headers {
   Content-Type: application/json
   Accept: application/json
+}
+
+auth:bearer {
+  token: {{authToken}}
 }
 
 body:json {
@@ -38,7 +38,7 @@ assert {
   res.status: eq 200
   res.body.success: eq true
   res.body.data.success: eq true
-  res.body.data.updatedTags: isDefined
+  res.body.data.filePath: isDefined
 }
 
 tests {

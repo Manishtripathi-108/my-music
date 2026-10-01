@@ -1,10 +1,10 @@
 meta {
-  name: Write Tags - Preserve Original Backup
+  name: Patch Tags - Single File (Happy Path)
   type: http
-  seq: 2
+  seq: 10
 }
 
-post {
+patch {
   url: {{baseUrl}}/api/media/tags
   body: json
   auth: bearer
@@ -23,9 +23,9 @@ body:json {
   {
     "path": "{{sampleAudioPath}}",
     "tags": {
-      "Comment": "Backup preserved test"
+      "Comment": "Production API Engineering Patch Test"
     },
-    "preserveOriginal": true
+    "preserveOriginal": false
   }
 }
 
@@ -33,13 +33,12 @@ assert {
   res.status: eq 200
   res.body.success: eq true
   res.body.data.success: eq true
-  res.body.data.backupPath: isDefined
 }
 
 tests {
-  test("should write tags preserving original backup file", function() {
+  test("should partially update tags via PATCH and return 200", function() {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().success).to.be.true;
-    expect(res.getBody().data.backupPath).to.be.a('string');
+    expect(res.getBody().data.success).to.be.true;
   });
 }

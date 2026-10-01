@@ -1,19 +1,18 @@
 import { NextResponse } from 'next/server';
 
-import { apiAccepted, apiInternalError, apiValidationError } from '@/server/api';
-import { scanRequestSchema, type ScanResponse } from '@/features/scanner';
+import { type ScanResponse, scanRequestSchema } from '@/features/scanner';
+import { apiAccepted, handleRouteError } from '@/server/api';
 
+/* ------------------------- Initiate Library Scan -------------------------- */
+
+/**
+ * POST /api/scan
+ * Initiates a background library scan for an audio directory.
+ */
 export async function POST(request: Request): Promise<NextResponse<ScanResponse>> {
-    const body = await request.json();
-
-    const parseResult = scanRequestSchema.safeParse(body);
-
-    if (!parseResult.success) {
-        return apiValidationError(parseResult.error.issues, 'Invalid scan request parameters');
-    }
-
     try {
-        const validData = parseResult.data;
+        const body = await request.json();
+        const validData = scanRequestSchema.parse(body);
         const scanId = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
         return apiAccepted(
@@ -29,6 +28,6 @@ export async function POST(request: Request): Promise<NextResponse<ScanResponse>
             }
         );
     } catch (error) {
-        return apiInternalError(error, 'Failed to initiate library scan');
+        return handleRouteError(error, 'Failed to initiate library scan');
     }
 }

@@ -185,7 +185,7 @@ Public API of a feature:
   - Route handlers must never manually inspect `if (!result.success)` on server calls. Allow errors to bubble or catch them only at the HTTP boundary to delegate directly to `handleRouteError(error, fallbackMessage)`.
   - The central error handler inspects error instances and messages, automatically mapping domain errors, Zod validation issues, syntax errors, and unexpected exceptions into standard `ApiResponse<T>` envelopes with the appropriate HTTP status codes.
 - **Universal Scope**:
-  - This rule applies strictly across services, clients (e.g., `ExifClient`, `AudioProber`, `MetaReader`), repositories, utilities, and API route handlers.
+  - This rule applies strictly across services, clients (e.g., `TagLibClient`, `AudioProber`, `MediaInfoClient`, `MediaConverter`, `MetaReader`), repositories, utilities, and API route handlers.
   - Enforce this convention in all future server code, refactors, and feature additions without exception.
 
 ## Routes and API handlers
@@ -336,6 +336,116 @@ export async function POST(request: Request): Promise<NextResponse<MyResponse>> 
   }
 }
 ```
+
+## Media Processing Architecture & Toolchain Standards
+
+The media processing subsystem is strictly partitioned into three specialized, decoupled engines. Native binaries are prioritized first for performance and resource efficiency, with WebAssembly (WASM) provided as a robust fallback or user-configurable engine option:
+
+```
++----------------------------------------------------------------------------------------------------+
+|                                    MEDIA SUBSYSTEM ENGINE ROLES                                    |
++----------------------------------------------------------------------------------------------------+
+|                                                                                                    |
+|  1. METADATA ENGINE: TagLib 2.x                                                                    |
+|     - Priority / Default: Native sidecar wrapping TagLib C/C++ bindings (taglib_c.h / C++17)        |
+|     - Fallback / User Option: taglib-wasm (in-process Node WebAssembly with corpus bake-off)       |
+|     - Responsibility: Read, edit, remove, and embed metadata & artwork without re-encoding audio  |
+|                                                                                                    |
+|  2. PROBING ENGINE: FFprobe (Primary) + MediaInfo (QC Supplement)                                  |
+|     - Primary Stream Inspector: ffprobe (isolated native subprocess with bounded concurrency)      |
+|     - Quality Control (QC) Supplement: MediaInfo (native CLI or mediainfo.js WASM fallback)       |
+|     - Fallback / User Option: mediainfo.js (WASM engine for sandboxed / zero-binary probing)      |
+|                                                                                                    |
+|  3. CONVERSION & DSP ENGINE: FFmpeg (LGPL Build)                                                   |
+|     - Priority / Default: Native FFmpeg 9.0.x or 8.1.x subprocess (LGPL v2.1+ build)                |
+|     - Fallback / User Option: @ffmpeg/ffmpeg (ffmpeg.wasm WebAssembly engine)                      |
+|     - Audio DSP: High-grade libsoxr resampling, triangular/Lipshitz dithering, channel matrices    |
+|                                                                                                    |
++----------------------------------------------------------------------------------------------------+
+```
+
+### 1. Metadata Engine: TagLib 2.x
+
+TagLib 2.x (C++17) is the authoritative metadata read and write engine due to its comprehensive write matrix across audio containers and active release cadence (v2.0 Jan 2024, v2.1 May 2025).
+
+#### Engine Priorities & Selection Strategy
+1. **Priority 1 (Native Engine - Default)**:
+   - Wrap TagLib 2.x's C/C++ bindings (`taglib_c.h` / C++17 API) in a small, self-contained native sidecar (via Node-API / `node-addon-api` or a dedicated native worker).
+   - Provides native OS filesystem seek-based I/O, unlimited memory headroom for multi-gigabyte files, zero WASI overhead, and maximum throughput.
+2. **Priority 2 / Fallback / User Option (`taglib-wasm`)**:
+   - Provide `taglib-wasm` as a WebAssembly fallback when native compilation or prebuilt binaries are unavailable, or allow the user to select the engine via configuration (`METADATA_ENGINE=native` | `wasm`).
+   - **Mandatory Corpus Bake-Off**: Before deploying `taglib-wasm` to production, execute a comprehensive bake-off against the project's audio corpus. The bake-off must validate:
+     - Runtime compatibility with the active Node.js version (WASI and WebAssembly exception handling).
+     - Seek-based I/O throughput and memory footprint during batch tag reading and writing.
+     - Tag preservation integrity across ID3v2.3, ID3v2.4, Vorbis Comments, MP4 atoms, RIFF INFO, and APEv2.
+     - Multi-artwork embedded buffer handling (`APIC`, `METADATA_BLOCK_PICTURE`, `covr`).
+
+#### Tag Writing Rules & Zero Re-encoding Mandate
+- **Zero Audio Re-encoding**: Metadata writes must never decode or re-encode audio frames. Audio bitstreams must be preserved bit-for-bit across both native and WASM engines.
+- **In-Place Modification (Padding-Fitting)**: When updated metadata fits within existing container padding, overwrite header bytes in place at offset 0 (or within the metadata atom). Never move or copy audio data when padding accommodates the change.
+- **Atomic File Replacement**: When updated tags exceed existing padding:
+  - Stream the modified header and exact audio frames into a temporary file in the **same directory** as the original file (`.target.ext.tmp_${uuid}`).
+  - Flush all buffers to physical media via `fsync` before committing.
+  - If `preserveOriginal: true`, rename the original file to `filename.ext_original`.
+  - Atomically rename the temporary file over the target (`fs.promises.rename` / POSIX `renameat` / Windows `MoveFileEx`).
+  - Preserve file timestamps (`atime`, `mtime`) via `fs.promises.utimes()`.
+
+### 2. Probing Engine: FFprobe + MediaInfo
+
+The probing subsystem provides technical audio inspection, stream validation, and container diagnostics:
+
+1. **Primary Prober (`ffprobe` - Native)**:
+   - Spawns native `ffprobe` as an isolated subprocess with bounded concurrency (`MAX_CONCURRENCY = 8`).
+   - Extracts standard technical metrics: codec, codec long name, container format, duration, bitrate, sample rate, channels, channel layout, and attached picture dispositions.
+2. **Quality Control (QC) Supplement (`MediaInfo`)**:
+   - Native `MediaInfo` CLI (or dynamic library) supplements `ffprobe` for deep stream diagnostics that `ffprobe` cannot reliably or efficiently report:
+     - Exact bitrate mode verification (`BitRate_Mode: CBR` vs `VBR`) without slow packet decoding.
+     - Unambiguous bit depth detection (`BitDepth: 16`, `24`, `32`) across lossy and lossless formats.
+     - Gapless playback validation: LAME/Xing header encoder delay and padding verification.
+     - Broadcast loudness analysis: ITU-R BS.1770 / EBU R128 integrated loudness and true-peak levels.
+     - Complete encoder library and settings inspection (`Encoded_Library_Settings`).
+3. **Fallback / User Option (`mediainfo.js` WASM)**:
+   - When native `ffprobe` or `mediainfo` binaries cannot be executed (e.g. restricted sandbox, zero-binary container, or user preference via `PROBING_ENGINE=native` | `wasm`), `mediainfo.js` (WebAssembly port of MediaInfoLib) acts as the in-process probing fallback.
+
+### 3. Conversion Engine: FFmpeg (LGPL Build)
+
+Audio conversion, transcoding, and DSP are delegated to FFmpeg, prioritizing native execution with a WebAssembly fallback:
+
+1. **Priority 1 (Native Engine - Default)**:
+   - Target native **FFmpeg 9.0.x** ("Lei") or **FFmpeg 8.1.x** ("Hoare") operated as an isolated child process with bounded concurrency pools.
+   - **Strict LGPL Build Requirement**: The FFmpeg distribution must be compiled under **LGPL v2.1+** (without `--enable-gpl` or `--enable-nonfree`). This guarantees complete commercial redistribution compliance and eliminates GPL viral copyleft risks.
+   - Codec selection under LGPL:
+     - **AAC**: Use FFmpeg's native `aac` encoder or OS MediaFoundation (`aac_mf` on Windows). Do not use non-free `libfdk_aac` unless an in-house non-redistributed binary is explicitly configured.
+     - **Opus**: Use `libopus` (BSD licensed).
+     - **MP3**: Use `libmp3lame` (LGPL licensed).
+     - **FLAC & ALAC**: Use native `flac` and `alac` encoders (LGPL licensed).
+     - **PCM**: Use native `pcm_s16le`, `pcm_s24le`, `pcm_s32le`, and `pcm_f32le`.
+   - **Professional Audio DSP & Resampling Standards**:
+     - **Resampling**: Always employ the SoX Resampler library embedded in FFmpeg (`-af "aresample=resampler=soxr:precision=28:cutoff=0.99"`) for high-fidelity anti-aliasing and phase linearity.
+     - **Dithering**: When reducing bit depth (e.g. 24-bit/32-bit float to 16-bit PCM), apply noise-shaped dithering (`-af "aresample=dither_method=triangular"` or `lipshitz`) to eliminate quantization distortion.
+     - **Multichannel Downmixing**: Apply standard ITU-R BS.775 matrix coefficients when downmixing 5.1/7.1 audio to stereo.
+   - **Process Execution & Real-Time Monitoring**:
+     - Monitor real-time transcoding progress by parsing `-progress pipe:1` or `pipe:2`.
+     - Implement clean cancellation: write `q` to `stdin` for graceful flush; fallback to `SIGTERM` and `SIGKILL` after 2 seconds.
+     - Transcode to a temporary sibling file in the destination directory to ensure atomic completion.
+2. **Priority 2 / Fallback / User Option (`@ffmpeg/ffmpeg` WASM)**:
+   - Provide `@ffmpeg/ffmpeg` (ffmpeg.wasm) as a WebAssembly fallback when native FFmpeg binaries cannot be installed on the host system, or allow the user to select the engine via configuration (`CONVERSION_ENGINE=native` | `wasm`).
+   - Operates in-process via virtual in-memory filesystem (MEMFS).
+   - Recommended for lightweight conversions, small audio files (< 200 MB), or environments where spawning native subprocesses is restricted. For large files, long recordings, or heavy batch operations, the native engine is preferred.
+3. **Zero Tag-Editing Rule**:
+   - **Never use FFmpeg (native or WASM) for metadata-only edits**; tag-only operations must always go through the Metadata Engine.
+
+### 4. Artwork Handling Standards
+
+1. **Container Extraction & Injection**:
+   - Artwork extraction and embedding must be performed natively by the **Metadata Engine (TagLib 2.x)**, avoiding full-file container remuxing.
+   - Supports ID3v2 `APIC` (types $03 Front, $04 Back), FLAC `METADATA_BLOCK_PICTURE`, and MP4 `covr` atoms across both Native and WASM TagLib engines.
+2. **Validation & Image Optimization (`sharp`)**:
+   - Validate extracted image buffers via magic bytes.
+   - Use `sharp` to inspect dimensions, auto-orient from EXIF, enforce maximum dimension thresholds (e.g. 1400×1400), and compress to progressive JPEG/WebP before injection or caching.
+3. **Deterministic Cache & Streaming**:
+   - Cache artwork under `cache/art/<sha256>.<ext>` keyed by `sha256(filePath + ":" + size + ":" + mtimeMs).slice(0, 24)`.
+   - Stream binary payloads via Web `ReadableStream` with `Cache-Control: public, max-age=31536000, immutable`.
 
 ## Naming and Code Clarity
 

@@ -9,7 +9,12 @@ const serverEnvSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
     EXIFTOOL_PATH: z.string().min(1).default('exiftool'),
+    FFMPEG_PATH: z.string().min(1).default('ffmpeg'),
     FFPROBE_PATH: z.string().min(1).default('ffprobe'),
+    MEDIAINFO_PATH: z.string().min(1).default('MediaInfo'),
+    METADATA_ENGINE: z.enum(['native', 'wasm']).default('native'),
+    PROBING_ENGINE: z.enum(['native', 'wasm']).default('native'),
+    CONVERSION_ENGINE: z.enum(['native', 'wasm']).default('native'),
     ART_CACHE_DIR: z.string().min(1).default('cache/art'),
 });
 

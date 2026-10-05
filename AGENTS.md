@@ -2,9 +2,9 @@
 
 # This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+This version has breaking changes - APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+This block is written and re-added by `next dev` - verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
 
@@ -21,68 +21,64 @@ This file defines where code lives. Follow it unless the user explicitly asks fo
 3. **Business code lives in `src/features/<feature>`.** Never in `components/`, `hooks/`, `lib/`, or `types/`.
 4. **Shared technical infrastructure lives in `src/server` (server-only) or `src/lib` (isomorphic).** Never inside a feature.
 5. **Server Components by default.** Add `"use client"` only for state, effects, browser APIs, or event handlers, and only on the smallest leaf component.
-6. **Server-only code never reaches the client bundle.** Every server-only module starts with `import "server-only"` (pure type-only files are exempt since types are erased at compile time).
-7. **The server enforces validation and authorization.** UI checks are presentation only.
-8. **Reuse before creating.** Search for an existing module first. No empty folders, no speculative abstractions, no new pattern for a single task.
-9. **No unrelated moves or renames** during a feature task.
-10. **Verify Next.js APIs against `node_modules/next/dist/docs/`**, not memory (routing files, request APIs, caching, and config may have changed).
-11. **Strict 80-character section divider comments.** To differentiate code blocks, use single-line `/* --------------------- Title --------------------- */` comments of EXACTLY 80 characters (no more, no less). Maintain JSDoc comments (`/** ... */`) above functions, routes, and types. Never use 3-line banners like `# ==========================================` or multi-line comment boxes.
+6. **The server enforces validation and authorization.** UI checks are presentation only.
+7. **Reuse before creating.** Search for an existing module first. No empty folders, no speculative abstractions, no new pattern for a single task.
+8. **Verify, don't assume.** Check Next.js APIs against `node_modules/next/dist/docs/`, and check the DBMS, ORM, and library versions against the project's `package.json`, lockfile, and existing code before relying on them.
+
+## Scope and boundaries
+
+- **Stay inside this project.** Do not read, modify, create, delete, or rename files outside the project root (other repos, home directory, system configuration, unrelated projects) without asking first. Exception: read-only lookup of installed dependency docs (e.g. `node_modules/next/dist/docs/`), even when hoisted above the app directory.
+- **Keep changes local.** No unrelated refactors, moves, renames, or reformatting during a task. No new dependencies, integrations, or top-level folders without approval.
+- **Never test against real user data.** Do not run scans, tag writes, conversions, or migrations against the user's real media library or any database other than the project's dev/test database. Use copies or fixtures inside the project unless the user explicitly authorizes otherwise.
 
 ## Folder structure
 
 ```
 project-root/
-├── public/                       # static assets only: images/, icons/, fonts/
+├── public/                       # static assets only
 ├── e2e/                          # end-to-end tests for real user flows
+├── cache/                        # runtime caches (e.g. cache/art/); gitignored
 ├── src/
 │   ├── app/                      # ROUTING + COMPOSITION
-│   │   ├── (marketing)/          # route groups: only when they own a layout or section
-│   │   ├── (auth)/
-│   │   ├── (dashboard)/
+│   │   ├── (group)/              # route groups: only when they own a layout or section
 │   │   ├── api/                  # thin route handlers
-│   │   ├── layout.tsx
-│   │   ├── error.tsx
-│   │   ├── global-error.tsx
-│   │   ├── not-found.tsx
-│   │   ├── globals.css
-│   │   └── favicon.ico
+│   │   ├── layout.tsx, error.tsx, global-error.tsx, not-found.tsx
+│   │   └── globals.css
 │   │
-│   ├── features/                 # BUSINESS DOMAINS: one folder per domain
-│   │   └── <feature>/
-│   │       ├── components/       # UI owned by this feature
-│   │       ├── actions/          # "use server" entry points (writes)
-│   │       ├── queries/          # server-only reads
-│   │       ├── services/         # server-only business operations
-│   │       ├── repositories/     # server-only DB access for this feature's data
-│   │       ├── schemas/          # validation schemas (isomorphic)
-│   │       ├── hooks/            # client hooks used only by this feature
-│   │       ├── types.ts
-│   │       ├── constants.ts
-│   │       ├── index.ts          # client-safe public API
-│   │       └── server.ts         # server-only public API
+│   ├── features/<feature>/       # BUSINESS DOMAINS: one folder per domain
+│   │   ├── components/           # UI owned by this feature
+│   │   ├── actions/              # "use server" entry points (writes)
+│   │   ├── queries/              # server-only reads
+│   │   ├── services/             # server-only business operations
+│   │   ├── repositories/         # server-only DB access for this feature's data
+│   │   ├── schemas/              # validation schemas (isomorphic)
+│   │   ├── hooks/                # client hooks used only by this feature
+│   │   ├── types.ts, constants.ts
+│   │   ├── index.ts              # client-safe public API
+│   │   └── server.ts             # server-only public API
 │   │
 │   ├── components/               # SHARED UI with no business knowledge
-│   │   ├── ui/                   # primitives: button, input, dialog, table
-│   │   ├── common/               # app-wide compounds: page-header, empty-state, confirm-dialog
-│   │   ├── layout/               # header, footer, sidebar, mobile-nav
-│   │   └── providers/            # generic providers: theme, query
+│   │   ├── ui/                   # primitives
+│   │   ├── common/               # app-wide compounds (page header, empty state, confirm dialog)
+│   │   ├── layout/               # header, footer, sidebar, mobile nav
+│   │   └── providers/            # generic providers (theme, query)
 │   │
-│   ├── hooks/                    # shared client hooks: useDebounce, useMediaQuery
-│   ├── lib/                      # generic isomorphic utilities: cn, format-date, logger
-│   │
+│   ├── hooks/                    # shared client hooks
+│   ├── lib/                      # generic isomorphic utilities
 │   ├── server/                   # SHARED SERVER INFRASTRUCTURE (server-only)
+│   │   ├── api/                  # response helpers, handleRouteError
 │   │   ├── db/                   # client, schema
-│   │   ├── auth/                 # auth library setup, session helpers
+│   │   ├── auth/                 # auth setup, session helpers
 │   │   └── services/             # email, storage, queue: used by 2+ features
 │   │
 │   ├── config/                   # env.server.ts, env.client.ts, site.ts, routes.ts
-│   └── types/                    # cross-cutting, domain-independent types
+│   └── types/                    # cross-cutting, domain-independent types (incl. api.ts)
 │
 └── ...                           # package.json, tsconfig.json, next.config.ts, .env.local, etc.
 ```
 
 - Every folder is optional. Create a folder only when it will hold files.
-- Tool-mandated folders (`prisma/`, `drizzle/`, `.github/`, `scripts/`) are fine at the root. Any other new top-level folder needs user approval.
+- Allowed at the root without approval: tool-mandated folders (`prisma/`, `drizzle/`, `.github/`, `scripts/`) and `cache/`. Any other new top-level folder needs approval.
 - `src/app/page.tsx` and `src/app/(group)/page.tsx` both resolve to `/` and collide. Keep only one.
 
 ## Where does it go
@@ -91,39 +87,32 @@ project-root/
 | --- | --- |
 | Route, layout, loading, error, metadata | `src/app/...` |
 | Route handler | `src/app/api/.../route.ts` |
-| UI used by one route only | `src/app/<route>/_components/` |
-| UI, logic, queries, schemas of one business domain | `src/features/<feature>/` |
+| UI used by one route only | `src/app/<route>/_components/` (move to the owning feature when a second route needs it) |
+| UI, logic, queries, schemas, types of one business domain | `src/features/<feature>/` |
 | Generic primitive (Button, Table) | `src/components/ui` |
 | App-wide component with no domain (PageHeader) | `src/components/common` |
 | Header, footer, sidebar | `src/components/layout` |
 | Generic provider (theme, query) | `src/components/providers` |
 | Provider that depends on a feature (session) | that feature's `components/` |
-| Client hook shared across features | `src/hooks` |
-| Client hook used by one feature | `src/features/<feature>/hooks` |
+| Client hook shared across features / used by one feature | `src/hooks` / `src/features/<feature>/hooks` |
 | Generic utility (cn, formatDate, logger) | `src/lib` |
-| DB client, email, storage, queue, auth setup | `src/server` |
+| DB client and schema, email, storage, queue, auth setup | `src/server` |
 | Typed env, site config, route constants | `src/config` |
-| Cross-cutting type (Pagination) | `src/types` |
-| Type for one domain | `src/features/<feature>/types.ts` |
+| Cross-cutting type (Pagination, ApiResponse) | `src/types` |
 | Static file | `public/` |
 
-## Layer contracts
+Layer boundaries:
 
-- **`app`**: Routes, groups, layouts, loading/error/not-found UI, route handlers, metadata. A page fetches via feature queries, selects feature components, and composes them.
-- **`features`**: Everything that exists because a business domain exists. Add only the subfolders the feature needs. A small feature may be just `components/`, `schemas/`, `types.ts`.
-- **`components/ui`**: Primitives. Must not know any business domain (`Table` yes, `UserTable` no).
-- **`components/common`, `layout`, `providers`**: App-wide only. If only one feature uses it, it belongs in that feature.
-- **`hooks`**: Reusable React hooks not owned by a feature.
-- **`lib`**: Small, boring, generic utilities. If a utility knows about orders, users, or billing, it belongs in that feature.
-- **`server`**: Technical infrastructure used by multiple features. It never contains feature business rules and is never imported by Client Components.
-- **`config`**: Typed, validated environment access and app constants. Read `process.env` only here.
-- **`types`**: Only types that genuinely span multiple modules. Do not use it to avoid deciding which feature owns a type.
+- **`components/ui`** knows no business domain (`Table` yes, `UserTable` no). **`common`, `layout`, `providers`** are app-wide only; if one feature uses it, it belongs in that feature.
+- **`lib`** is small and generic. If a utility knows about orders, users, or billing, it belongs in that feature.
+- **`server`** holds infrastructure shared by 2+ features. No feature business rules; never imported by Client Components.
+- **`types`** holds only genuinely cross-cutting types. Do not use it to avoid deciding which feature owns a type.
 
 ## Dependency rules
 
 | Layer | May import | Must not import |
 | --- | --- | --- |
-| `app` | features (public API), components, hooks, lib, server, config, types | none of the layers below import it |
+| `app` | features (public API), components, hooks, lib, server, config, types | - |
 | `features` | own internals; other features via public API only; components, hooks, lib, server, config, types | `app` |
 | `components` | hooks, lib, config (client-safe), types | `app`, `features`, `server` |
 | `hooks` | lib, config (client-safe), types | `app`, `features`, `components`, `server` |
@@ -132,11 +121,10 @@ project-root/
 | `config` | types | everything else |
 | `types` | nothing | all application layers |
 
-Additional rules:
-
 - Feature-to-feature imports go through the other feature's `index.ts` (client-safe) or `server.ts` (server-only). No deep imports into its internals.
 - No circular dependencies. When two features need the same capability, extract a proper shared module.
 - Use the `@/` path alias. No long relative paths like `../../../`.
+- If the repo has import-boundary lint rules, treat violations as errors.
 
 ## Feature anatomy and data flow
 
@@ -147,10 +135,10 @@ Write:  Form / Client Component -> actions/ -> services/ -> repositories/ -> ser
 
 | Folder | Responsibility | Rules |
 | --- | --- | --- |
-| `actions/` | Server Action entry points | Thin: authenticate → validate → authorize → call service → revalidate/redirect → return. Return a typed result for expected failures instead of throwing. |
+| `actions/` | Server Action entry points | Thin: authenticate → validate → authorize → call service → revalidate/redirect → return. Expected failures return a typed result (see [Error handling](#error-handling)). |
 | `queries/` | Named, reusable reads | Server-only. Never called from Client Components. Filter data by what the caller may see. |
-| `services/` | Business operations (`create-order`, `cancel-order`) | Server-only. Business work only, never UI behavior. Add one only when logic spans steps or entities; a simple query may call a repository directly. |
-| `repositories/` | The only place in a feature that touches the ORM or SQL | Server-only. No business rules. |
+| `services/` | Business operations | Server-only. Business work only, never UI behavior. Own transaction boundaries. Add one only when logic spans steps or entities; a simple query may call a repository directly. |
+| `repositories/` | The only place in a feature that touches the ORM or SQL | Server-only. No business rules. Accept an optional transaction handle. |
 | `schemas/` | Validation, single source of truth | Infer TypeScript types from schemas. Never duplicate rules in components. |
 | `components/` | Feature UI | Server Components by default. No data access inside; receive data via props. |
 
@@ -159,177 +147,88 @@ Public API of a feature:
 - `index.ts`: client-safe exports only (components, types, schemas, constants).
 - `server.ts`: starts with `import "server-only"`; exports queries and services other modules may call.
 - `actions/*`: may be imported by Client Components directly.
-- Create `index.ts` / `server.ts` when another module first needs the feature. Do not add barrel files anywhere else (`components/ui/index.ts` is the only accepted exception).
+- Create `index.ts` / `server.ts` when another module first needs the feature. No other barrel files (`components/ui/index.ts` is the only exception).
 
 ## Server / client boundary
 
 - Keep `"use client"` at the leaf. Pass server-rendered content down as `children` or props. Props crossing the boundary must be serializable.
-- `import "server-only"` is required in: `src/server/**`, `features/*/{queries,services,repositories}/**`, every `server.ts`, `config/env.server.ts`. Pure type-only files (`types.ts` or files containing only TypeScript types/interfaces) are exempt since types emit no JavaScript runtime code.
-- Environment: `config/env.server.ts` (server-only, validated) and `config/env.client.ts` (`NEXT_PUBLIC_*` only). Never read `process.env` anywhere else.
-- Client writes go through Server Actions. Use Route Handlers only when a real HTTP endpoint is needed (webhooks, third-party or mobile clients). Never call your own API routes from server code.
+- `import "server-only"` is required in `src/server/**`, `features/*/{queries,services,repositories}/**`, every `server.ts`, and `config/env.server.ts`. Pure type-only files are exempt (types emit no runtime code).
+- Environment: `config/env.server.ts` (server-only, validated) and `config/env.client.ts` (`NEXT_PUBLIC_*` only). Read `process.env` only in `src/config`, including `NODE_ENV` and the engine switches; expose typed values (e.g. `isProduction`) from there.
+- Client writes go through Server Actions. Use Route Handlers only when a real HTTP endpoint is needed: streaming or binary delivery, long-running jobs the client polls, webhooks, external clients, or an existing REST endpoint. Never call your own API routes from server code.
 - Prefer server state and URL state (search params). Use client state libraries only for genuinely shared client state. Do not mirror server data into client stores.
 
 ## Security and validation
 
 - Validate all untrusted input at the server boundary (actions, route handlers, webhooks) with the owning feature's schema. Client validation is UX only.
-- Server Actions and Route Handlers are public endpoints. Each one authenticates and authorizes on its own; never assume the page already did.
+- Server Actions and Route Handlers are public endpoints. Each authenticates and authorizes on its own; never assume the page already did.
 - Domain permission rules live in the owning feature, not in buttons or pages.
 - Return only the fields the client needs. Never pass secrets, internal IDs, or full DB rows to Client Components.
+- **Client-supplied file paths:** resolve to an absolute path, canonicalize (`realpath`), and verify it sits inside an allowed root defined in `src/config` before any filesystem or subprocess use. If no allowed-root policy exists, ask before adding a path-accepting endpoint.
+- **Subprocesses:** use `spawn`/`execFile` with an argument array, never a shell string, and pass only validated absolute paths.
 
-## Server error handling and propagation
+## Error handling
 
-- **Never return or pass errors as strings anywhere in server code**:
-  - Do not use return shapes like `{ success: false, error: "message" }` or string error values as an error-propagation mechanism between functions, classes, or architecture layers.
-  - Always **throw or reject proper `Error` instances** (or typed domain error classes such as `NotFoundError`, `BadRequestError`, or `ConflictError`).
-- **Central API error translation**:
-  - Route handlers must never manually inspect `if (!result.success)` on server calls. Allow errors to bubble or catch them only at the HTTP boundary to delegate directly to `handleRouteError(error, fallbackMessage)`.
-  - The central error handler inspects error instances and messages, automatically mapping domain errors, Zod validation issues, syntax errors, and unexpected exceptions into standard `ApiResponse<T>` envelopes with the appropriate HTTP status codes.
-- **Universal Scope**:
-  - This rule applies strictly across services, clients (e.g., `TagLibClient`, `AudioProber`, `MediaInfoClient`, `MediaConverter`, `MetaReader`), repositories, utilities, and API route handlers.
-  - Enforce this convention in all future server code, refactors, and feature additions without exception.
+- **Throw, don't return, inside server code.** Services, repositories, engine clients (`TagLibClient`, `AudioProber`, `MediaInfoClient`, `MediaConverter`, `MetaReader`), and utilities signal failure by throwing `Error` instances: typed domain errors such as `NotFoundError`, `BadRequestError`, `ConflictError`. Never propagate failures as strings or `{ success: false, error: "message" }` between layers.
+- **Route Handlers:** one `try/catch` whose `catch` only calls `handleRouteError(error, fallbackMessage)`. Never branch on `result.success`. The central handler maps domain errors, Zod errors, syntax errors, and unknown errors to an `ApiResponse<T>` with the right status. Map by error class or code, never by message text.
+- **Server Actions** are the UI boundary: catch expected domain errors and return a typed result whose failure branch carries a stable error code and field errors, not a message string. Let unexpected errors propagate to `error.tsx`.
+- Use `try/catch` elsewhere only to add context, recover, convert an error, or return a safe result.
+- Errors in the UI: `error.tsx` per segment, `global-error.tsx` for the root fallback, `not-found.tsx` for missing content.
 
 ## Routes and API handlers
 
-- Use route groups when they own a layout or a clear section, not to make the tree look tidy.
-- Route-specific UI goes in a private `_components/` folder beside the route. If a second route needs it, move it to the owning feature. `_components` is not a second global component system.
+- Route groups only when they own a layout or a clear section, not to tidy the tree.
 - Route Handlers do HTTP only: method handling, parse input, authenticate/authorize, call feature logic, return response.
-- Errors: `error.tsx` per segment, `global-error.tsx` for the root fallback, `not-found.tsx` for missing content. Use `try/catch` only to add context, recover, convert an error, or return a safe result.
 
-## API response standard
+### Response envelope
 
-Every Route Handler (`src/app/api/**/route.ts`) must return a strongly typed, predictable `ApiResponse<T>` envelope using the server helpers from `@/server/api`. Never return ad-hoc, unstructured JSON or HTTP 200 for failed operations.
+Every Route Handler returns a typed `ApiResponse<T>` built with the helpers in `@/server/api`. Never return ad-hoc JSON, or HTTP 200 for a failed operation. The source of truth is `src/types/api.ts`: success is `{ success: true, data, message?, meta? }`, failure is `{ success: false, error: { code, message, details? } }`. Frontend logic inspects `error.code`, never the message.
 
-### Envelope structure
+| Status | Scenario | Helper |
+| --- | --- | --- |
+| 200 | Successful read, update, or action | `apiSuccess` |
+| 201 | Resource created | `apiCreated` |
+| 202 | Async job queued | `apiAccepted` |
+| 204 | Successful deletion or empty action | `apiNoContent` |
+| 400 | Malformed JSON or invalid syntax | `apiBadRequest` |
+| 401 | Missing or invalid authentication | `apiUnauthorized` |
+| 403 | Authenticated but not permitted | `apiForbidden` |
+| 404 | Resource does not exist | `apiNotFound` |
+| 409 | State conflict or duplicate | `apiConflict` |
+| 422 | Input validation failure (Zod) | `apiValidationError` (via `handleRouteError`), `details: ApiFieldError[]` |
+| 429 | Rate limit exceeded | `apiRateLimited` |
+| 500 | Unhandled exception | `apiInternalError` (via `handleRouteError`) |
 
-Defined in `src/types/api.ts`:
+In production, `apiInternalError` logs the full error server-side and returns only a generic message. Stack traces, file paths, queries, and environment details never reach a response body.
 
-```ts
-// Success Response
-type ApiSuccess<T> = {
-  success: true;
-  data: T;
-  message?: string;
-  meta?: ApiMeta; // pagination, cursor, timestamp, requestId
-};
+### Methods and URLs
 
-// Error Response
-type ApiError = {
-  success: false;
-  error: {
-    code: ApiErrorCode; // Stable machine-readable code
-    message: string;    // Human-readable summary
-    details?: unknown;  // Structured field errors (ApiFieldError[]) or debug info
-  };
-};
+- Choose the method by the operation: `GET` read (safe, idempotent, cacheable); `POST` create, non-CRUD actions, or large batch payloads; `PUT` full replacement; `PATCH` partial update; `DELETE` removal. Never use `GET` or `POST` to delete.
+- Prefer resource URLs (`PATCH /api/media/tags`) over action URLs (`/api/media/tags/update`). Use action URLs only for genuine actions (`POST /api/scan`).
+- Use only the canonical method per operation. No delegating alias handlers (e.g. a `POST` fallback for a `PATCH`).
 
-// Root Discriminated Union
-type ApiResponse<T> = ApiSuccess<T> | ApiError;
-```
+### Binary and streaming delivery
 
-### Production HTTP method selection & resource routing
+- Stream via a web `ReadableStream` (`Readable.toWeb(nodeStream)`) with `Content-Type` and `Content-Length`. Never buffer whole files in memory.
+- Use `Cache-Control: public, max-age=31536000, immutable` only when the URL contains the content or cache key, so a changed file gets a new URL. Otherwise use `ETag` and revalidation.
 
-- **Identify the actual operation first**: Do not use `POST` for every endpoint by default. Choose standard HTTP semantics matching the operation:
-  - **`GET`**: Reading resources or retrieving data (idempotent, safe, cacheable).
-  - **`POST`**: Creating new resources, non-CRUD operations, or submitting large payload batches (e.g. array of paths) for server-side processing.
-  - **`PUT`**: Complete replacement of a resource (idempotent).
-  - **`PATCH`**: Partial update of an existing resource, modifying only the fields supplied by the client (e.g., updating specific audio tags).
-  - **`DELETE`**: Removing resources (never use GET or POST for deletion).
-- **Resource-Oriented URLs**: Prefer resource URLs (`PATCH /api/media/tags`) over action-based URLs (`/api/media/tags/update`). Use action endpoints only when an operation is genuinely an action (`POST /api/scan`).
-- **Binary and Streaming Delivery**: For binary payloads (such as album artwork or audio files), stream directly via web `ReadableStream` (`Readable.toWeb(nodeStream)`) with appropriate caching headers (`Cache-Control: public, max-age=31536000, immutable`), `Content-Type`, and `Content-Length`. Never buffer entire files in Node.js memory.
-- **Strict Canonical REST (No Backward-Compatibility Bloat)**: Do not export redundant delegating handlers (such as a POST fallback for a PATCH or GET endpoint). Use strictly the canonical HTTP method for each operation without legacy method aliasing.
-
-### HTTP status code rules
-
-| HTTP Status | Scenario | Server Helper | Default Code |
-| --- | --- | --- | --- |
-| **200 OK** | Successful read, update, or action | `apiSuccess(data, options?)` | — |
-| **201 Created** | Resource created | `apiCreated(data, options?)` | — |
-| **202 Accepted** | Async job queued / long-running task | `apiAccepted(data, options?)` | — |
-| **204 No Content** | Successful deletion or empty action | `apiNoContent()` | — |
-| **400 Bad Request** | Malformed JSON or invalid syntax | `apiBadRequest(message?, options?)` | `BAD_REQUEST` / `MALFORMED_JSON` |
-| **401 Unauthorized** | Missing or invalid authentication | `apiUnauthorized(message?, options?)` | `UNAUTHORIZED` |
-| **403 Forbidden** | Authenticated user lacks permission | `apiForbidden(message?, options?)` | `FORBIDDEN` |
-| **404 Not Found** | Target resource does not exist | `apiNotFound(message?, options?)` | `NOT_FOUND` |
-| **409 Conflict** | State conflict or duplicate entity | `apiConflict(message?, options?)` | `CONFLICT` |
-| **422 Unprocessable** | Input validation failure (Zod) | `apiValidationError(issues, message?)` | `VALIDATION_ERROR` |
-| **429 Too Many Requests** | Rate limit exceeded | `apiRateLimited(message?, options?)` | `RATE_LIMITED` |
-| **500 Server Error** | Unhandled exception | `apiInternalError(err, message?)` | `INTERNAL_SERVER_ERROR` |
-
-### Machine-readable error codes (`ApiErrorCodes`)
-
-Frontend logic must inspect `error.code` rather than parsing human-readable messages. Standard codes in `src/types/api.ts`:
-- `VALIDATION_ERROR`
-- `BAD_REQUEST`, `MALFORMED_JSON`, `INVALID_QUERY_PARAMS`
-- `UNAUTHORIZED`, `SESSION_EXPIRED`, `INVALID_TOKEN`
-- `FORBIDDEN`, `INSUFFICIENT_PERMISSIONS`
-- `NOT_FOUND`, `RESOURCE_NOT_FOUND`
-- `CONFLICT`, `ALREADY_EXISTS`
-- `RATE_LIMITED`
-- `INTERNAL_SERVER_ERROR`, `SERVICE_UNAVAILABLE`, `EXTERNAL_SERVICE_ERROR`
-
-### Validation error rules
-
-- When Zod parsing fails (`parseResult.success === false`), return `apiValidationError(parseResult.error.issues)`.
-- Returns **HTTP 422** with `details: ApiFieldError[]`:
-  ```json
-  {
-    "success": false,
-    "error": {
-      "code": "VALIDATION_ERROR",
-      "message": "Invalid scan request parameters",
-      "details": [
-        { "field": "directory", "message": "Directory path cannot be empty", "code": "too_small" }
-      ]
-    }
-  }
-  ```
-
-### Security and sanitization
-
-- In production (`process.env.NODE_ENV === 'production'`), `apiInternalError()` logs full error traces on the server but returns only a generic, safe error message to the client. Stack traces, file paths, database queries, and environment details must NEVER reach the response body.
-
-### Commenting and code division standards
-
-- **Strict 80-Character Section Dividers**:
-  - To visually differentiate between logical code sections or blocks in source files, use single-line divider comments formatted as:
-    `/* --------------------- Section Title --------------------- */`
-  - The total length of the comment line MUST ALWAYS be **EXACTLY 80 characters** — no more, no less.
-  - Dashes are distributed symmetrically around the title with single spaces separating the dashes and text.
-  - Never use multi-line decorative block banners such as:
-    ```
-    # ==========================================
-    # Media Processing Tool Binaries
-    # ==========================================
-    ```
-    or multi-line `/* ------- */` boxes.
-- **Maintain JSDoc Comments**:
-  - Always maintain standard JSDoc block comments (`/** ... */`) above functions, classes, interfaces, types, and route handlers. JSDoc is for documenting contracts, params, and behavior; the 80-character divider comment is used solely to separate distinct sections of code.
-
-### API creation standard & route handler template
-
-Every Route Handler (`src/app/api/**/route.ts`) must:
-1. Include JSDoc comments directly above each exported HTTP method documenting the route, method, params, and behavior.
-2. Parse request payloads directly using `schema.parse(body)` (or query parameters schema).
-3. Delegate all error formatting to `handleRouteError(error, fallbackMessage)`. Do not repeat manual `safeParse`, `apiValidationError`, or nested try/catch blocks in route handlers.
-4. Return standardized `ApiResponse<T>` envelopes via `apiSuccess`, `apiCreated`, or `apiAccepted`.
+### Handler template
 
 ```ts
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
+import type { ApiResponse } from '@/types/api';
 import { apiAccepted, handleRouteError } from '@/server/api';
-import { myRequestSchema, type MyResponse } from '@/features/my-feature';
-import { getMyService } from '@/features/my-feature/server';
+import { myRequestSchema, type MyResult } from '@/features/my-feature';
+import { startMyTask } from '@/features/my-feature/server';
 
 /**
  * POST /api/my-task
- * Body: MyRequest
- * Queues a task for asynchronous processing.
+ * Body: MyRequest. Queues a task for asynchronous processing (202).
  */
-export async function POST(request: Request): Promise<NextResponse<MyResponse>> {
+export async function POST(request: Request): Promise<NextResponse<ApiResponse<MyResult>>> {
   try {
-    const body = await request.json();
-    const data = myRequestSchema.parse(body);
-
-    const result = await getMyService().processTask(data);
+    // Authenticate and authorize here, before touching the payload.
+    const payload = myRequestSchema.parse(await request.json());
+    const result = await startMyTask(payload);
     return apiAccepted(result, { message: 'Task queued successfully' });
   } catch (error) {
     return handleRouteError(error, 'Failed to process task');
@@ -337,185 +236,107 @@ export async function POST(request: Request): Promise<NextResponse<MyResponse>> 
 }
 ```
 
-## Media Processing Architecture & Toolchain Standards
+Every handler has a JSDoc comment above each exported method (route, method, params, behavior), parses input with `schema.parse(...)`, and delegates all error formatting to `handleRouteError`.
 
-The media processing subsystem is strictly partitioned into three specialized, decoupled engines. Native binaries are prioritized first for performance and resource efficiency, with WebAssembly (WASM) provided as a robust fallback or user-configurable engine option:
+## Database and data architecture
 
-```
-+----------------------------------------------------------------------------------------------------+
-|                                    MEDIA SUBSYSTEM ENGINE ROLES                                    |
-+----------------------------------------------------------------------------------------------------+
-|                                                                                                    |
-|  1. METADATA ENGINE: TagLib 2.x                                                                    |
-|     - Priority / Default: Native sidecar wrapping TagLib C/C++ bindings (taglib_c.h / C++17)        |
-|     - Fallback / User Option: taglib-wasm (in-process Node WebAssembly with corpus bake-off)       |
-|     - Responsibility: Read, edit, remove, and embed metadata & artwork without re-encoding audio  |
-|                                                                                                    |
-|  2. PROBING ENGINE: FFprobe (Primary) + MediaInfo (QC Supplement)                                  |
-|     - Primary Stream Inspector: ffprobe (isolated native subprocess with bounded concurrency)      |
-|     - Quality Control (QC) Supplement: MediaInfo (native CLI or mediainfo.js WASM fallback)       |
-|     - Fallback / User Option: mediainfo.js (WASM engine for sandboxed / zero-binary probing)      |
-|                                                                                                    |
-|  3. CONVERSION & DSP ENGINE: FFmpeg (LGPL Build)                                                   |
-|     - Priority / Default: Native FFmpeg 9.0.x or 8.1.x subprocess (LGPL v2.1+ build)                |
-|     - Fallback / User Option: @ffmpeg/ffmpeg (ffmpeg.wasm WebAssembly engine)                      |
-|     - Audio DSP: High-grade libsoxr resampling, triangular/Lipshitz dithering, channel matrices    |
-|                                                                                                    |
-+----------------------------------------------------------------------------------------------------+
-```
+Before creating or changing a schema, inspect the project's actual DBMS, ORM, migration tool, and existing schema, and design for that stack. Do not assume one, and do not replace an existing design when a targeted change is enough.
 
-### 1. Metadata Engine: TagLib 2.x
+- **Where and how:** schema lives in `src/server/db`, feature data access in `repositories/`. Schema changes go through the project's migration tool. Migrations are reviewed and never edited after being applied. Destructive changes (drop, rename, narrowing a type) need approval.
+- **Keys:** every entity gets a stable surrogate primary key from the DBMS's native identity mechanism (PostgreSQL `GENERATED ... AS IDENTITY`, MySQL `AUTO_INCREMENT`, SQL Server `IDENTITY`, SQLite `INTEGER PRIMARY KEY`). Mutable business fields (file path, title, email) get a `UNIQUE` constraint, not the primary key.
+- **Integrity:** declare foreign keys explicitly with a deliberate `ON DELETE` behavior. Enforce invariants in the database (`NOT NULL`, `UNIQUE`, `CHECK`), not only in application code.
+- **Normalization:** normalize by default. Denormalize only for a measured read-path need, and say why in the change.
+- **Types:** use the smallest precise type; exact types for money (decimal or integer minor units); timezone-aware timestamps where the DBMS supports them.
+- **Indexes:** add one only for a real access pattern (join/filter columns, frequent `WHERE`/`ORDER BY`, unique lookups) with column order matching the query. Check whether the DBMS auto-indexes foreign keys (PostgreSQL does not). Confirm with the query plan (`EXPLAIN`) on realistic data volume. No speculative indexes; each one adds write cost.
+- **Transactions:** services own them. Multi-statement writes that must succeed together run in one transaction. Keep network calls, subprocesses, and file I/O out of open transactions.
+- **Queries:** no N+1 patterns, select only needed columns, paginate unbounded lists.
+- **Compatibility:** confirm any DBMS-specific feature is supported by the project's ORM and migration tool before using it.
 
-TagLib 2.x (C++17) is the authoritative metadata read and write engine due to its comprehensive write matrix across audio containers and active release cadence (v2.0 Jan 2024, v2.1 May 2025).
+## Media processing
 
-#### Engine Priorities & Selection Strategy
-1. **Priority 1 (Native Engine - Default)**:
-   - Wrap TagLib 2.x's C/C++ bindings (`taglib_c.h` / C++17 API) in a small, self-contained native sidecar (via Node-API / `node-addon-api` or a dedicated native worker).
-   - Provides native OS filesystem seek-based I/O, unlimited memory headroom for multi-gigabyte files, zero WASI overhead, and maximum throughput.
-2. **Priority 2 / Fallback / User Option (`taglib-wasm`)**:
-   - Provide `taglib-wasm` as a WebAssembly fallback when native compilation or prebuilt binaries are unavailable, or allow the user to select the engine via configuration (`METADATA_ENGINE=native` | `wasm`).
-   - **Mandatory Corpus Bake-Off**: Before deploying `taglib-wasm` to production, execute a comprehensive bake-off against the project's audio corpus. The bake-off must validate:
-     - Runtime compatibility with the active Node.js version (WASI and WebAssembly exception handling).
-     - Seek-based I/O throughput and memory footprint during batch tag reading and writing.
-     - Tag preservation integrity across ID3v2.3, ID3v2.4, Vorbis Comments, MP4 atoms, RIFF INFO, and APEv2.
-     - Multi-artwork embedded buffer handling (`APIC`, `METADATA_BLOCK_PICTURE`, `covr`).
+The media subsystem is three decoupled engines. Native binaries are the default; WebAssembly (WASM) is a fallback or a user-selected option.
 
-#### Tag Writing Rules & Zero Re-encoding Mandate
-- **Zero Audio Re-encoding**: Metadata writes must never decode or re-encode audio frames. Audio bitstreams must be preserved bit-for-bit across both native and WASM engines.
-- **In-Place Modification (Padding-Fitting)**: When updated metadata fits within existing container padding, overwrite header bytes in place at offset 0 (or within the metadata atom). Never move or copy audio data when padding accommodates the change.
-- **Atomic File Replacement**: When updated tags exceed existing padding:
-  - Stream the modified header and exact audio frames into a temporary file in the **same directory** as the original file (`.target.ext.tmp_${uuid}`).
-  - Flush all buffers to physical media via `fsync` before committing.
-  - If `preserveOriginal: true`, rename the original file to `filename.ext_original`.
-  - Atomically rename the temporary file over the target (`fs.promises.rename` / POSIX `renameat` / Windows `MoveFileEx`).
-  - Preserve file timestamps (`atime`, `mtime`) via `fs.promises.utimes()`.
+| Role | Default (native) | Fallback (WASM) | Selector |
+| --- | --- | --- | --- |
+| Metadata | TagLib 2.x native sidecar | `taglib-wasm` | `METADATA_ENGINE=native\|wasm` |
+| Probing | `ffprobe` (primary) + MediaInfo (QC supplement) | `mediainfo.js` | `PROBING_ENGINE=native\|wasm` |
+| Conversion and DSP | FFmpeg 9.0.x or 8.1.x, LGPL build | `@ffmpeg/ffmpeg` | `CONVERSION_ENGINE=native\|wasm` |
 
-### 2. Probing Engine: FFprobe + MediaInfo
+- Each engine sits behind one interface. Features depend on the interface, never on a specific engine. Selectors are validated in `config/env.server.ts` and default to `native`.
+- Native tools run as isolated subprocesses with bounded concurrency.
+- Never use FFmpeg for metadata-only edits; tag operations always go through the Metadata Engine.
 
-The probing subsystem provides technical audio inspection, stream validation, and container diagnostics:
+### Metadata (TagLib 2.x)
 
-1. **Primary Prober (`ffprobe` - Native)**:
-   - Spawns native `ffprobe` as an isolated subprocess with bounded concurrency (`MAX_CONCURRENCY = 8`).
-   - Extracts standard technical metrics: codec, codec long name, container format, duration, bitrate, sample rate, channels, channel layout, and attached picture dispositions.
-2. **Quality Control (QC) Supplement (`MediaInfo`)**:
-   - Native `MediaInfo` CLI (or dynamic library) supplements `ffprobe` for deep stream diagnostics that `ffprobe` cannot reliably or efficiently report:
-     - Exact bitrate mode verification (`BitRate_Mode: CBR` vs `VBR`) without slow packet decoding.
-     - Unambiguous bit depth detection (`BitDepth: 16`, `24`, `32`) across lossy and lossless formats.
-     - Gapless playback validation: LAME/Xing header encoder delay and padding verification.
-     - Broadcast loudness analysis: ITU-R BS.1770 / EBU R128 integrated loudness and true-peak levels.
-     - Complete encoder library and settings inspection (`Encoded_Library_Settings`).
-3. **Fallback / User Option (`mediainfo.js` WASM)**:
-   - When native `ffprobe` or `mediainfo` binaries cannot be executed (e.g. restricted sandbox, zero-binary container, or user preference via `PROBING_ENGINE=native` | `wasm`), `mediainfo.js` (WebAssembly port of MediaInfoLib) acts as the in-process probing fallback.
+- **Native (default):** wrap TagLib's C API (`tag_c.h`) or C++17 API in a self-contained sidecar (Node-API / `node-addon-api` or a dedicated worker).
+- **`taglib-wasm`:** check its Node.js version requirement against the project's Node version, since it has changed between releases. Before using it in production, run a bake-off against the project's audio corpus covering: seek-based I/O throughput and memory, tag preservation across ID3v2.3, ID3v2.4, Vorbis Comments, MP4 atoms, RIFF INFO and APEv2, and multi-artwork handling (`APIC`, `METADATA_BLOCK_PICTURE`, `covr`).
+- **Never re-encode audio.** Tag writes preserve audio data bit-for-bit.
+- **Crash-safe writes:** when an update fits existing padding, write in place. Otherwise write to a temporary sibling file in the same directory (`.<name>.tmp_<uuid>`), restore `atime`/`mtime` with `fs.promises.utimes()`, `fsync`, then atomically rename it over the target. With `preserveOriginal: true`, first hard-link (or copy, if linking is unsupported) the original to `<name>.<ext>_original`, so the target path never goes missing.
 
-### 3. Conversion Engine: FFmpeg (LGPL Build)
+### Probing (ffprobe + MediaInfo)
 
-Audio conversion, transcoding, and DSP are delegated to FFmpeg, prioritizing native execution with a WebAssembly fallback:
+- `ffprobe` is the primary prober: codec, container, duration, bitrate, sample rate, channels, channel layout, attached-picture dispositions. Concurrency is bounded (default `MAX_CONCURRENCY = 8`).
+- MediaInfo supplements it where `ffprobe` is weak: bitrate mode (CBR/VBR), bit depth, and encoder library/settings and gapless-related header details. Confirm field names against real MediaInfo output on corpus files.
+- `mediainfo.js` (WASM) replaces native probing when binaries cannot run (restricted sandbox) or the user selects it.
+- Loudness (EBU R128 / ITU-R BS.1770) is not a probing field: measure it on demand with FFmpeg's `ebur128` filter, never during bulk scans.
 
-1. **Priority 1 (Native Engine - Default)**:
-   - Target native **FFmpeg 9.0.x** ("Lei") or **FFmpeg 8.1.x** ("Hoare") operated as an isolated child process with bounded concurrency pools.
-   - **Strict LGPL Build Requirement**: The FFmpeg distribution must be compiled under **LGPL v2.1+** (without `--enable-gpl` or `--enable-nonfree`). This guarantees complete commercial redistribution compliance and eliminates GPL viral copyleft risks.
-   - Codec selection under LGPL:
-     - **AAC**: Use FFmpeg's native `aac` encoder or OS MediaFoundation (`aac_mf` on Windows). Do not use non-free `libfdk_aac` unless an in-house non-redistributed binary is explicitly configured.
-     - **Opus**: Use `libopus` (BSD licensed).
-     - **MP3**: Use `libmp3lame` (LGPL licensed).
-     - **FLAC & ALAC**: Use native `flac` and `alac` encoders (LGPL licensed).
-     - **PCM**: Use native `pcm_s16le`, `pcm_s24le`, `pcm_s32le`, and `pcm_f32le`.
-   - **Professional Audio DSP & Resampling Standards**:
-     - **Resampling**: Always employ the SoX Resampler library embedded in FFmpeg (`-af "aresample=resampler=soxr:precision=28:cutoff=0.99"`) for high-fidelity anti-aliasing and phase linearity.
-     - **Dithering**: When reducing bit depth (e.g. 24-bit/32-bit float to 16-bit PCM), apply noise-shaped dithering (`-af "aresample=dither_method=triangular"` or `lipshitz`) to eliminate quantization distortion.
-     - **Multichannel Downmixing**: Apply standard ITU-R BS.775 matrix coefficients when downmixing 5.1/7.1 audio to stereo.
-   - **Process Execution & Real-Time Monitoring**:
-     - Monitor real-time transcoding progress by parsing `-progress pipe:1` or `pipe:2`.
-     - Implement clean cancellation: write `q` to `stdin` for graceful flush; fallback to `SIGTERM` and `SIGKILL` after 2 seconds.
-     - Transcode to a temporary sibling file in the destination directory to ensure atomic completion.
-2. **Priority 2 / Fallback / User Option (`@ffmpeg/ffmpeg` WASM)**:
-   - Provide `@ffmpeg/ffmpeg` (ffmpeg.wasm) as a WebAssembly fallback when native FFmpeg binaries cannot be installed on the host system, or allow the user to select the engine via configuration (`CONVERSION_ENGINE=native` | `wasm`).
-   - Operates in-process via virtual in-memory filesystem (MEMFS).
-   - Recommended for lightweight conversions, small audio files (< 200 MB), or environments where spawning native subprocesses is restricted. For large files, long recordings, or heavy batch operations, the native engine is preferred.
-3. **Zero Tag-Editing Rule**:
-   - **Never use FFmpeg (native or WASM) for metadata-only edits**; tag-only operations must always go through the Metadata Engine.
+### Conversion (FFmpeg, LGPL)
 
-### 4. Artwork Handling Standards
+- Verify the native binary is an LGPL build: the `configuration:` line of `ffmpeg -version` must contain neither `--enable-gpl` nor `--enable-nonfree`.
+- Encoders: AAC via native `aac` (or `aac_mf` on Windows; never `libfdk_aac` unless the user configures an in-house, non-redistributed binary); Opus via `libopus`; MP3 via `libmp3lame`; FLAC and ALAC via native encoders; PCM via `pcm_s16le`, `pcm_s24le`, `pcm_s32le`, `pcm_f32le`.
+- Resample with SoX: `-af "aresample=resampler=soxr:precision=28:cutoff=0.99"`.
+- When reducing bit depth, dither: `-af "aresample=dither_method=triangular"` (or `lipshitz`).
+- Downmix multichannel to stereo with standard ITU-R BS.775 coefficients.
+- Report progress by parsing `-progress pipe:1`. Cancel gracefully: write `q` to `stdin`, then `SIGTERM`, then `SIGKILL` after 2 seconds.
+- Transcode to a temporary sibling file in the destination directory, then rename on success.
+- `@ffmpeg/ffmpeg` (WASM) runs in memory (MEMFS). Use it for small files (under about 200 MB) or where spawning subprocesses is restricted; prefer native for large files and batches.
 
-1. **Container Extraction & Injection**:
-   - Artwork extraction and embedding must be performed natively by the **Metadata Engine (TagLib 2.x)**, avoiding full-file container remuxing.
-   - Supports ID3v2 `APIC` (types $03 Front, $04 Back), FLAC `METADATA_BLOCK_PICTURE`, and MP4 `covr` atoms across both Native and WASM TagLib engines.
-2. **Validation & Image Optimization (`sharp`)**:
-   - Validate extracted image buffers via magic bytes.
-   - Use `sharp` to inspect dimensions, auto-orient from EXIF, enforce maximum dimension thresholds (e.g. 1400×1400), and compress to progressive JPEG/WebP before injection or caching.
-3. **Deterministic Cache & Streaming**:
-   - Cache artwork under `cache/art/<sha256>.<ext>` keyed by `sha256(filePath + ":" + size + ":" + mtimeMs).slice(0, 24)`.
-   - Stream binary payloads via Web `ReadableStream` with `Cache-Control: public, max-age=31536000, immutable`.
+### Artwork
 
-## Naming and Code Clarity
+- Extraction and embedding go through the Metadata Engine (ID3v2 `APIC` types `$03` front and `$04` back, FLAC `METADATA_BLOCK_PICTURE`, MP4 `covr`), with no container remuxing.
+- Validate buffers by magic bytes. Use `sharp` to inspect dimensions, auto-orient from EXIF, cap dimensions (e.g. 1400×1400), and compress to progressive JPEG/WebP before embedding or caching.
+- Cache at `cache/art/<key>.<ext>` with `key = sha256(filePath + ":" + size + ":" + mtimeMs).slice(0, 24)`.
+- **Invalidate a file's cache entry on every tag write.** Padded in-place writes keep `size`, and restored timestamps keep `mtime`, so the key alone will not change.
 
-### File and casing conventions
+## Naming and code clarity
 
-- **React Components**: Use `PascalCase` filenames matching the component name for standalone components, such as `Button.tsx`, `Badge.tsx`, `ThemeToggle.tsx`, `Topbar.tsx`, and `ScanModal.tsx`.
-- **Complex / Multi-file Components**: Use a kebab-case folder with kebab-case internal files, such as `checkbox/checkbox.tsx`, `checkbox/checkbox-control.tsx`, `checkbox/checkbox-label.tsx`, and `checkbox/checkbox-root.tsx`.
-- **Hooks**: Use `camelCase` filenames prefixed with `use`, such as `useTheme.ts` and `useAudioPlayer.ts`.
-- **File Extensions**: Use `.tsx` only when the file contains JSX. Hooks, utilities, services, and other files without JSX must use `.ts`.
-- **Strict Consistency**: Keep naming consistent throughout the project. Never mix `useTheme.ts` with `use-theme.ts`, or `Button.tsx` with `button.tsx`.
-- **Non-Component Modules**: Use `kebab-case` for services, schemas, actions, queries, types, and generic technical libraries, such as `media.service.ts`, `scan-request.schema.ts`, `format.ts`, and `cn.ts`.
-- **Next.js Special Files**: Retain framework-mandated lowercase names, such as `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, and `route.ts`.
-- **Type Names**: Use `PascalCase`. **Functions and variables**: use `camelCase`. **True constants**: use `UPPER_SNAKE_CASE` when matching existing project style.
-- **Actions and Queries**: Use verb-noun names, such as `create-order.ts` and `list-orders.ts`.
-- **Tests**: Keep unit and component tests beside the source, such as `order-service.test.ts`. Full flows go in `e2e/*.spec.ts`.
+### Files
 
-### Identifier naming principles
+- **Components:** a single-file component is `PascalCase.tsx` (`Button.tsx`, `ScanModal.tsx`). A multi-file component is a kebab-case folder with kebab-case parts (`checkbox/checkbox-root.tsx`). A component uses one style, never both.
+- **Hooks:** `camelCase` with a `use` prefix (`useTheme.ts`).
+- **Extensions:** `.tsx` only when the file contains JSX; otherwise `.ts`.
+- **Other modules:** `kebab-case`. Services, schemas, and repositories carry a role suffix (`media.service.ts`, `scan-request.schema.ts`). Actions and queries are verb-noun without a suffix (`create-order.ts`, `list-orders.ts`). Utilities and clients are plain kebab-case (`format.ts`, `taglib-client.ts`).
+- **Next.js special files** keep their mandated lowercase names (`page.tsx`, `layout.tsx`, `route.ts`, ...).
+- **Tests:** beside the source, named after it (`media.service.test.ts`). Full flows go in `e2e/*.spec.ts`.
+- **Code:** types `PascalCase`; functions and variables `camelCase`; true constants `UPPER_SNAKE_CASE`.
 
-- Choose the shortest name that clearly explains the role or purpose.
-- A name should describe what something represents or does, not how it is implemented.
-- Avoid vague abbreviations such as `seq`, `ctx`, `obj`, `data`, `res`, `req`, `item`, `tmp`, `val`, or `info` when a clearer short name is available.
-- Prefer meaningful short names such as `requestId`, `currentRequest`, `toolProcess`, `outputBuffer`, `filePath`, `tagMap`, `result`, or `options`.
-- Avoid unnecessarily long names. Add words only when they remove ambiguity.
-- Keep naming consistent across the file and project. Use the same vocabulary for related concepts.
-- Prefer nouns for stored values and state, and verbs for functions that perform actions.
-- Boolean names should read as a yes/no condition, such as `isClosing`, `hasError`, `shouldRetry`, or `includeArtwork`.
-- Functions should clearly describe their action, such as `runNext()`, `parseOutput()`, `handleCrash()`, or `ensureProcess()`.
-- Avoid abbreviations unless they are universally understood in the domain, such as `URL`, `API`, `ID`, `HTTP`, `JSON`, or `UTF8`.
+### Identifiers
 
-### Naming decision rule
+- Use the shortest name that makes the role clear. Describe what something is or does, not how it is implemented.
+- Prefer specific names (`requestId`, `toolProcess`, `outputBuffer`, `filePath`, `tagMap`) over vague ones (`tmp`, `val`, `obj`, `ctx`, `info`). Names fixed by a contract, such as `data` in `ApiResponse`, are exempt.
+- Nouns for values and state; verbs for functions (`runNext`, `parseOutput`). Booleans read as conditions (`isClosing`, `hasError`, `shouldRetry`).
+- Abbreviate only universal terms (`URL`, `API`, `ID`, `HTTP`, `JSON`, `UTF8`). Use one vocabulary for each concept across the project.
+- Rename vague identifiers only in code you are already changing.
 
-Before choosing a name, ask:
+### Comments and section dividers
 
-1. What does this represent?
-2. What role does it play?
-3. Can that meaning be expressed in fewer words?
-4. Would another developer understand it without reading the implementation?
+- **JSDoc** (`/** ... */`) goes on exported functions, classes, types, and route handlers. It documents the contract: params, behavior, errors. Do not restate the signature. Internal helpers get one only when non-obvious.
+- **Other comments** explain non-obvious intent, constraints, or protocol behavior. Do not comment obvious code, compensate for poor naming with comments, or annotate line by line.
+- **Section dividers** separate major sections of a long file. They are single-line, at column 0, and exactly 80 characters, with the title centered between dashes (an odd remainder puts the extra dash on the right):
 
-Choose the shortest name that passes all four checks.
+  ```ts
+  /* --------------------------------- Types ---------------------------------- */
+  ```
 
-### Comments
+  Never use multi-line banners or boxes. Generate and check dividers with these commands instead of counting characters:
 
-- Add small, meaningful comments only where they clarify non-obvious intent, logic, protocol behavior, constraints, or important decisions.
-- Do not comment obvious code or describe what the code already clearly says.
-- Do not use comments to compensate for poor naming. Improve the name instead.
-- Keep comments short, professional, and focused.
-- Do not bloat files with comments on every line or block.
+  ```sh
+  node -e 'const t=process.argv[1],d=72-t.length,l=d>>1;console.log(`/* ${"-".repeat(l)} ${t} ${"-".repeat(d-l)} */`)' "Title"
+  grep -rhE '^/\* -{2,} .+ -{2,} \*/$' src | awk 'length != 80'
+  ```
 
-### Refactoring existing names
-
-When improving code, actively review existing names and replace vague names when their intent is unclear.
-
-| Vague | Preferred |
-| --- | --- |
-| `seq` | `requestId` |
-| `active` | `currentRequest` |
-| `child` | `toolProcess` |
-| `proc` | `toolProcess` |
-| `stdoutBuffer` | `outputBuffer` |
-| `drain()` | `runNext()` |
-| `req` | `request` |
-| `val` | `value` |
-| `err` | `error` |
-| `res` | `response` or `result` |
-
-Do not blindly apply these replacements. Choose names based on the actual responsibility in context.
-
-### Persistence
-
-When these naming, formatting, or comment rules are introduced or changed, update the project's `AGENTS.md` or equivalent agent instruction file so they are preserved and followed in future work.
+  The second command prints any divider that is not 80 characters.
+- When the user sets or changes a naming, formatting, or comment convention, record it in this file in the same change. Keep one source of truth.
 
 ## Scaling triggers
 
@@ -523,31 +344,31 @@ Promote code on the second real use, not in anticipation.
 
 | Signal | Action |
 | --- | --- |
-| Another module needs a feature's code | Expose it through `index.ts` / `server.ts`. Do not deep import. |
+| Another module needs a feature's code | Expose it through `index.ts` / `server.ts`. No deep imports. |
 | Two features need the same business capability | Extract a new feature (domain logic) or `server/services` (infrastructure). Never cross-import internals. |
 | UI used by 2+ features with no domain knowledge | Move to `components/common` or `components/ui`. |
-| A feature has independent sub-domains (billing → invoices, subscriptions) | Split into sibling features. Do not nest features. |
+| A feature has independent sub-domains | Split into sibling features. Do not nest features. |
 | A folder is hard to scan (roughly 15+ files) | Group into subfolders by sub-area. |
 | A flow spans several features | Compose it in the route (`app/`) or create a dedicated feature. |
-| A second deployable app or shared code with another app appears | Move to a monorepo (`apps/`, `packages/`) at that point, not before. |
+| A second deployable app or code shared with another app appears | Move to a monorepo (`apps/`, `packages/`) at that point, not before. |
 
 ## Anti-patterns
 
-- Folders named `utils/`, `helpers/`, `common/`, `shared/`, or a root-level `services/`.
-- `components/<domain>/` (for example `components/orders/`). Use `features/` instead.
+- Catch-all folders: `utils/`, `helpers/`, `shared/`, `misc/`, or a root-level `src/services/`.
+- `components/<domain>/` (e.g. `components/orders/`). Use `features/` instead.
 - One giant `types/index.ts` or one giant services file.
 - Database calls in components, hooks, `page.tsx`, or `layout.tsx`.
 - Business rules hidden in `lib/`.
 - `components/ui` importing from a feature, or any layer importing from `app/`.
 - Client Components importing from `src/server` or from `queries/`, `services/`, `repositories/`.
 - `"use client"` on a page or layout to make an error go away.
-- Barrel files in every folder.
+- Barrel files outside the sanctioned ones.
 - Duplicating validation or authorization rules across components.
 
 ## Refactoring
 
 - Preserve the existing architecture. Move code only when its current placement is clearly wrong.
-- Update imports and tests when moving files, check all consumers of changed public paths, and delete dead files after the move.
+- When moving files, update imports and tests, check all consumers of changed public paths, and delete dead files.
 - If existing project conventions conflict with this file, ask before choosing.
 
 ## When to ask
@@ -558,6 +379,7 @@ Ask the user before proceeding when:
 - A new top-level folder or a new shared abstraction affecting several features seems necessary.
 - The request conflicts with this file or with existing project conventions.
 - The task requires choosing between two materially different patterns.
+- A change would touch files outside the project, or run against real user data or a non-dev database.
 
 Do not ask about placements this file already answers.
 
@@ -566,11 +388,9 @@ Do not ask about placements this file already answers.
 - [ ] Route files only route and compose.
 - [ ] Code sits in the layer that owns it; shared code is truly shared.
 - [ ] Server-only code is guarded with `server-only` and isolated from Client Components.
-- [ ] DB access stays in repositories and `src/server/db`.
-- [ ] Input is validated and authorized on the server.
+- [ ] DB access stays in repositories and `src/server/db`; schema changes go through migrations.
+- [ ] Input is validated and authorized on the server; errors are thrown and translated per [Error handling](#error-handling).
 - [ ] Imports follow the dependency table; no cycles or deep cross-feature imports.
-- [ ] No unnecessary folders, duplicate utilities, or duplicated logic.
-- [ ] Tests added or updated for changed behavior.
+- [ ] The diff contains no unrelated changes, new dependencies, or duplicated logic.
+- [ ] Tests are added or updated for changed behavior.
 - [ ] The project's lint, typecheck, and test scripts (see `package.json`) pass.
-
-If the repo has import-boundary lint rules, treat violations as errors. Proposing to add them (for example `no-restricted-imports` or `eslint-plugin-boundaries`) is welcome, but do not add dependencies without approval.

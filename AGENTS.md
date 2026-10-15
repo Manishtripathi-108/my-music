@@ -24,6 +24,7 @@ This file defines where code lives. Follow it unless the user explicitly asks fo
 6. **The server enforces validation and authorization.** UI checks are presentation only.
 7. **Reuse before creating.** Search for an existing module first. No empty folders, no speculative abstractions, no new pattern for a single task.
 8. **Verify, don't assume.** Check Next.js APIs against `node_modules/next/dist/docs/`, and check the DBMS, ORM, and library versions against the project's `package.json`, lockfile, and existing code before relying on them.
+9. **API and Bruno synchronization.** Whenever you change, add, or remove route files (`src/app/api/...`), always update the corresponding Bruno request files in `bruno/` to match the exact HTTP methods, URLs, request schemas, response structures, and assertions.
 
 ## Scope and boundaries
 
@@ -178,6 +179,7 @@ Public API of a feature:
 
 - Route groups only when they own a layout or a clear section, not to tidy the tree.
 - Route Handlers do HTTP only: method handling, parse input, authenticate/authorize, call feature logic, return response.
+- **Bruno Collection Sync (MANDATORY)**: Whenever route files are created, modified, or deleted (`src/app/api/...`), you MUST immediately update, add, or delete the corresponding Bruno request files in `bruno/` to keep the API collection in exact parity with schemas, HTTP methods, route URLs, request payloads, response structures, and status assertions.
 
 ### Response envelope
 
@@ -293,8 +295,8 @@ The media subsystem is three decoupled engines. Native binaries are the default;
 
 ### Artwork
 
-- Extraction and embedding go through the Metadata Engine (ID3v2 `APIC` types `$03` front and `$04` back, FLAC `METADATA_BLOCK_PICTURE`, MP4 `covr`), with no container remuxing.
-- Validate buffers by magic bytes. Use `sharp` to inspect dimensions, auto-orient from EXIF, cap dimensions (e.g. 1400×1400), and compress to progressive JPEG/WebP before embedding or caching.
+- Extraction and embedding go through the Metadata Engine (TagLib 2.x, ID3v2 `APIC` types `$03` front and `$04` back, FLAC `METADATA_BLOCK_PICTURE`, MP4 `covr`), with zero container remuxing.
+- Validate buffers by magic bytes. Dimensions and MIME types are parsed via zero-dependency pure buffer inspection (JPEG SOF0/SOF2 and PNG IHDR headers). Do not introduce Sharp or external image processing libraries.
 - Cache at `cache/art/<key>.<ext>` with `key = sha256(filePath + ":" + size + ":" + mtimeMs).slice(0, 24)`.
 - **Invalidate a file's cache entry on every tag write.** Padded in-place writes keep `size`, and restored timestamps keep `mtime`, so the key alone will not change.
 
@@ -393,4 +395,5 @@ Do not ask about placements this file already answers.
 - [ ] Imports follow the dependency table; no cycles or deep cross-feature imports.
 - [ ] The diff contains no unrelated changes, new dependencies, or duplicated logic.
 - [ ] Tests are added or updated for changed behavior.
+- [ ] Bruno API collection files (`bruno/`) are updated to match any modified or added route handlers.
 - [ ] The project's lint, typecheck, and test scripts (see `package.json`) pass.

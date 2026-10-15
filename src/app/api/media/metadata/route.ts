@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { type CombinedAudioMetadata, singleMetadataQuerySchema } from '@/features/media';
+import { metadataCoordinator } from '@/features/media/server';
 import { apiSuccess, handleRouteError } from '@/server/api';
-import { getMetaReader } from '@/server/media';
 
 /* ----------------- Single Audio File Metadata Inspection ------------------ */
 
@@ -13,11 +13,17 @@ import { getMetaReader } from '@/server/media';
 export async function GET(request: Request): Promise<NextResponse> {
     try {
         const { searchParams } = new URL(request.url);
-        const { path } = singleMetadataQuerySchema.parse({
+        const query = singleMetadataQuerySchema.parse({
             path: searchParams.get('path') ?? undefined,
+            includeQC: searchParams.get('includeQC') ?? undefined,
+            raw: searchParams.get('raw') ?? undefined,
         });
 
-        const metadata: CombinedAudioMetadata = await getMetaReader().read(path);
+        const metadata: CombinedAudioMetadata = await metadataCoordinator.read(query.path, {
+            includeQC: query.includeQC,
+            includeRawPayload: query.raw,
+        });
+
         return apiSuccess(metadata);
     } catch (error) {
         return handleRouteError(error, 'Failed to inspect audio metadata');

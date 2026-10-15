@@ -23,12 +23,12 @@ body:json {
   {
     "path": "{{sampleAudioPath}}",
     "tags": {
-      "Title": "Master of Puppets",
-      "Artist": "Metallica",
-      "Album": "Master of Puppets (Remastered)",
-      "Year": 1986,
-      "Genre": ["Heavy Metal", "Thrash Metal"],
-      "TrackNumber": 2
+      "title": "Master of Puppets",
+      "artists": ["Metallica"],
+      "album": "Master of Puppets (Remastered)",
+      "year": 1986,
+      "genres": ["Heavy Metal", "Thrash Metal"],
+      "trackNumber": 2
     },
     "preserveOriginal": false
   }
@@ -37,7 +37,6 @@ body:json {
 assert {
   res.status: eq 200
   res.body.success: eq true
-  res.body.data.success: eq true
   res.body.data.filePath: isDefined
 }
 
@@ -45,6 +44,6 @@ tests {
   test("should write tags and return 200", function() {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().success).to.be.true;
-    expect(res.getBody().data.success).to.be.true;
+    expect(res.getBody().data.filePath).to.be.a('string');
   });
 }

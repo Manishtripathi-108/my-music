@@ -5,8 +5,8 @@ import { z } from 'zod';
 
 import type { ApiError } from '@/types/api';
 
-import { BadRequestError, NotFoundError } from './errors';
-import { apiBadRequest, apiInternalError, apiNotFound, apiValidationError } from './response';
+import { BadRequestError, ForbiddenError, NotFoundError } from './errors';
+import { apiBadRequest, apiForbidden, apiInternalError, apiNotFound, apiValidationError } from './response';
 
 /* --------------------- Universal Route Error Handler ---------------------- */
 
@@ -26,7 +26,12 @@ export function handleRouteError(error: unknown, fallbackMessage = 'Internal ser
         return apiNotFound(error.message);
     }
 
-    // 3. Explicit bad request -> 400 Bad Request
+    // 3. Forbidden access / path traversal -> 403 Forbidden
+    if (error instanceof ForbiddenError) {
+        return apiForbidden(error.message);
+    }
+
+    // 4. Explicit bad request -> 400 Bad Request
     if (error instanceof BadRequestError) {
         return apiBadRequest(error.message);
     }

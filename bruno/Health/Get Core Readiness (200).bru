@@ -1,0 +1,34 @@
+meta {
+  name: Get Core Readiness (200)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/health/ready
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.status: isDefined
+  res.body.data.checks: isDefined
+  res.body.data.checks.configuration: eq ready
+  res.body.data.checks.storage: isDefined
+  res.body.data.timestamp: isDefined
+}
+
+tests {
+  test("should return 200 with readiness status and checks", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.status).to.be.oneOf(["ready", "unready"]);
+    expect(res.getBody().data.checks.configuration).to.equal("ready");
+  });
+}

@@ -1,0 +1,36 @@
+meta {
+  name: Remove Artwork - File Not Found (404)
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{baseUrl}}/api/media/artwork?path={{nonExistentAudioPath}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  path: {{nonExistentAudioPath}}
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+assert {
+  res.status: eq 404
+  res.body.success: eq false
+  res.body.error.code: eq NOT_FOUND
+}
+
+tests {
+  test("should return 404 when file does not exist", function() {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().success).to.be.false;
+  });
+}

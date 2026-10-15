@@ -1,8 +1,13 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  reactCompiler: true,
+    reactCompiler: true,
+    serverExternalPackages: [
+        'taglib-wasm',
+        'mediainfo.js',
+        '@ffmpeg/ffmpeg',
+        '@ffmpeg/core',
+    ],
 };
 
 export default nextConfig;

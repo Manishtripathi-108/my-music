@@ -1,25 +1,33 @@
 import { NextResponse } from 'next/server';
 
-import { type TechnicalAudioInfo, technicalQuerySchema } from '@/features/media';
+import { technicalQuerySchema } from '@/features/media';
+import { metadataCoordinator } from '@/features/media/server';
 import { apiSuccess, handleRouteError } from '@/server/api';
-import { createAudioProber } from '@/server/media';
 
 /* ----------------- Single Audio File Technical Inspection ----------------- */
 
 /**
- * GET /api/media/technical?path=/path/to/song.flac
- * Inspects technical audio stream properties via FFprobe.
+ * GET /api/media/technical?path=/path/to/song.flac&includeQC=true
+ * Inspects technical audio stream properties via FFprobe and optional MediaInfo QC.
  */
 export async function GET(request: Request): Promise<NextResponse> {
     try {
         const { searchParams } = new URL(request.url);
-        const { path } = technicalQuerySchema.parse({
+        const query = technicalQuerySchema.parse({
             path: searchParams.get('path') ?? undefined,
+            includeQC: searchParams.get('includeQC') ?? undefined,
         });
 
-        const prober = createAudioProber();
-        const technical: TechnicalAudioInfo = await prober.inspect(path);
-        return apiSuccess(technical);
+        const metadata = await metadataCoordinator.read(query.path, {
+            extractArtwork: false,
+            includeQC: query.includeQC,
+            includeRawPayload: false,
+        });
+
+        return apiSuccess({
+            technical: metadata.technical,
+            qc: metadata.qc,
+        });
     } catch (error) {
         return handleRouteError(error, 'Failed to inspect technical audio properties');
     }

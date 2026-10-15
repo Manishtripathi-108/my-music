@@ -25,17 +25,18 @@ headers {
 assert {
   res.status: eq 200
   res.body.success: eq true
-  res.body.data.codec: isDefined
-  res.body.data.sampleRate: isDefined
-  res.body.data.channels: isDefined
-  res.body.data.duration: isDefined
+  res.body.data.technical: isDefined
+  res.body.data.technical.codec: isDefined
+  res.body.data.technical.sampleRate: isDefined
+  res.body.data.technical.channels: isDefined
+  res.body.data.technical.duration: isDefined
 }
 
 tests {
   test("should return 200 with FFprobe technical specs", function() {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().success).to.be.true;
-    expect(res.getBody().data.codec).to.be.a('string');
-    expect(res.getBody().data.sampleRate).to.be.a('number');
+    expect(res.getBody().data.technical.codec).to.be.a('string');
+    expect(res.getBody().data.technical.sampleRate).to.be.a('number');
   });
 }

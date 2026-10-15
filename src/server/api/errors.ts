@@ -21,6 +21,16 @@ export class BadRequestError extends Error {
 }
 
 /**
+ * Thrown when access to a resource or path is not permitted.
+ */
+export class ForbiddenError extends Error {
+    constructor(message: string = 'Access forbidden') {
+        super(message);
+        this.name = 'ForbiddenError';
+    }
+}
+
+/**
  * Thrown when a conflict with existing state occurs.
  */
 export class ConflictError extends Error {

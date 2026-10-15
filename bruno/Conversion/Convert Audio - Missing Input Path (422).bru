@@ -1,0 +1,39 @@
+meta {
+  name: Convert Audio - Missing Input Path (422)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/media/convert
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "targetFormat": "mp3"
+  }
+}
+
+assert {
+  res.status: eq 422
+  res.body.success: eq false
+  res.body.error: isDefined
+}
+
+tests {
+  test("rejects missing input path with 422 validation error", function() {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().success).to.be.false;
+  });
+}

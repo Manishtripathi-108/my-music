@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 
-import { type AudioTags, type TagWriteResult, tagsQuerySchema, writeTagsRequestSchema } from '@/features/media';
+import {
+    type AudioTags,
+    type TagWriteResult,
+    tagsQuerySchema,
+    writeTagsRequestSchema,
+} from '@/features/media';
+import { metadataCoordinator } from '@/features/media/server';
 import { apiSuccess, handleRouteError } from '@/server/api';
-import { getExifClient, getMetaReader } from '@/server/media';
 
 /* ----------------------- Read Audio File Tags (GET) ----------------------- */
 
@@ -17,7 +22,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             path: searchParams.get('path') ?? undefined,
         });
 
-        const metadata = await getMetaReader().read(path, {
+        const metadata = await metadataCoordinator.read(path, {
             extractArtwork: false,
             includeRawPayload: false,
         });
@@ -33,15 +38,15 @@ export async function GET(request: Request): Promise<NextResponse> {
 
 /**
  * PATCH /api/media/tags
- * Body: { path: string, tags: Record<string, string | number | string[] | null>, preserveOriginal?: boolean }
- * Partially updates metadata tags on a single audio file.
+ * Body: { path: string, tags: WriteAudioTags, preserveOriginal?: boolean }
+ * Partially updates metadata tags on a single audio file using TagLib.
  */
 export async function PATCH(request: Request): Promise<NextResponse> {
     try {
         const body = await request.json();
         const input = writeTagsRequestSchema.parse(body);
 
-        const result: TagWriteResult = await getExifClient().writeTags(input.path, input.tags, {
+        const result: TagWriteResult = await metadataCoordinator.writeTags(input.path, input.tags, {
             preserveOriginal: input.preserveOriginal,
         });
 

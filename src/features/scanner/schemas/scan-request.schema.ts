@@ -1,13 +1,10 @@
 import { z } from 'zod';
+import { filePathSchema } from '@/lib/media';
 
 export const scanModeEnum = z.enum(['addNew', 'forceAll', 'rescanErrors']);
 
 export const scanRequestSchema = z.object({
-    directory: z
-        .string()
-        .trim()
-        .min(1, 'Directory path cannot be empty')
-        .transform((val) => val.replace(/\\+/g, '/').replace(/\/+$/, '')),
+    directory: filePathSchema.transform((val) => val.replace(/\/+$/, '')),
     scanMode: scanModeEnum.default('addNew'),
     recursive: z
         .union([z.boolean(), z.literal(''), z.literal('true'), z.literal('false'), z.literal('on')])

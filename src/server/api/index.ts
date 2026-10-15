@@ -20,4 +20,4 @@ export {
 } from './response';
 
 export { handleRouteError } from './error-handler';
-export { NotFoundError, BadRequestError, ConflictError } from './errors';
+export { NotFoundError, BadRequestError, ForbiddenError, ConflictError } from './errors';

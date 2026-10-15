@@ -1,0 +1,42 @@
+meta {
+  name: Get Single Metadata - With MediaInfo QC (200)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/media/metadata?path={{sampleAudioPathFlac}}&includeQC=true
+  body: none
+  auth: bearer
+}
+
+params:query {
+  path: {{sampleAudioPathFlac}}
+  includeQC: true
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.tags: isDefined
+  res.body.data.technical: isDefined
+  res.body.data.qc: isDefined
+}
+
+tests {
+  test("returns unified metadata including TagLib tags and MediaInfo QC", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.tags).to.be.an('object');
+    expect(res.getBody().data.technical).to.be.an('object');
+    expect(res.getBody().data.qc).to.be.an('object');
+  });
+}

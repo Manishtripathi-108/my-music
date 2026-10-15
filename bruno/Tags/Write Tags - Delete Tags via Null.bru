@@ -23,8 +23,8 @@ body:json {
   {
     "path": "{{sampleAudioPath}}",
     "tags": {
-      "Comment": null,
-      "Lyrics": null
+      "comment": null,
+      "lyrics": null
     },
     "preserveOriginal": false
   }
@@ -33,12 +33,13 @@ body:json {
 assert {
   res.status: eq 200
   res.body.success: eq true
-  res.body.data.success: eq true
+  res.body.data.filePath: isDefined
 }
 
 tests {
   test("should delete tags with null values and return 200", function() {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.filePath).to.be.a('string');
   });
 }

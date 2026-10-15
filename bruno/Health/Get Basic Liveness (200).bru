@@ -1,0 +1,32 @@
+meta {
+  name: Get Basic Liveness (200)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/health
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.status: eq ok
+  res.body.data.uptime: isDefined
+  res.body.data.timestamp: isDefined
+}
+
+tests {
+  test("should return 200 with ok liveness status", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.status).to.equal("ok");
+    expect(typeof res.getBody().data.uptime).to.equal("number");
+  });
+}

@@ -1,200 +1,142 @@
-export type ExifTagValue = string | number | string[] | null | undefined;
+import 'server-only';
 
-/**
- * Normalized technical audio properties extracted via FFprobe.
- */
-export interface TechnicalAudioInfo {
-    /** Codec identifier, for example `flac`, `alac`, `mp3`, or `aac`. */
-    codec: string;
+import type { AudioTags, BitrateMode, ConversionTargetFormat } from '@/lib/media';
 
-    /** Human-readable codec name. */
-    codecLongName: string;
+/* -------------------------- Artwork Domain Models ------------------------- */
 
-    /** Container format identifier. */
-    containerFormat: string;
-
-    /** Human-readable container format name. */
-    containerLongName: string;
-
-    /** Exact audio duration in seconds. */
-    duration: number;
-
-    /** Overall bitrate in bits per second. */
-    bitrate: number;
-
-    /** Audio sample rate in Hertz. */
-    sampleRate: number;
-
-    /** Number of audio channels. */
-    channels: number;
-
-    /** Channel layout, for example `stereo` or `5.1(side)`. */
-    channelLayout?: string;
-
-    /** Bits per sample when available. */
-    bitsPerSample?: number;
-
-    /** Whether the codec is mathematically lossless. */
-    isLossless: boolean;
-
-    /** Whether FFprobe detected an attached-picture stream (e.g. cover art). */
-    hasAttachedPicture: boolean;
-
-    /** Total stream count in the container. */
-    streamCount: number;
-
-    /** Raw FFprobe stream objects for advanced inspection. */
-    rawStreams?: unknown[];
-
-    /** Raw FFprobe format metadata for advanced inspection. */
-    rawFormat?: Record<string, unknown>;
-}
-
-/**
- * Normalized audio tag metadata extracted via ExifTool.
- */
-export interface AudioTags {
-    title?: string;
-    artist?: string;
-    artists?: string[];
-    album?: string;
-    albumArtist?: string;
-    composer?: string;
-    genre?: string[];
-    year?: number;
-    date?: string;
-    trackNumber?: number;
-    trackTotal?: number;
-    discNumber?: number;
-    discTotal?: number;
-    bpm?: number;
-    compilation?: boolean;
-    isrc?: string;
-    comment?: string;
-    lyrics?: string;
-    rating?: number;
-    replayGainTrackGain?: string;
-    replayGainTrackPeak?: string;
-    replayGainAlbumGain?: string;
-    replayGainAlbumPeak?: string;
-    encoder?: string;
-    copyright?: string;
-}
-
-/**
- * Information about extracted & cached album artwork.
- */
 export interface ExtractedArtwork {
-    /** Absolute filesystem path to the cached image. */
     cachedPath: string;
-
-    /** Cached image filename. */
     filename: string;
-
-    /** Image MIME type. */
     mimeType: string;
-
-    /** Image size in bytes. */
     sizeBytes: number;
-
-    /** Image width when detected. */
     width?: number;
-
-    /** Image height when detected. */
     height?: number;
-
-    /** Tool that extracted the artwork, or whether it came from cache. */
-    source: 'exiftool' | 'cache';
 }
 
-/**
- * Combined high-level audio metadata result produced by the MetaReader.
- * Merges technical parameters from FFprobe and tag metadata from ExifTool.
- */
-export interface CombinedAudioMetadata {
-    /** Normalized absolute path to the audio file. */
-    filePath: string;
+export interface RawPictureData {
+    data: Buffer;
+    mimeType: string;
+    description?: string;
+}
 
-    /** File size in bytes. */
-    fileSizeBytes: number;
+/* ------------------------- Technical Probing Models ----------------------- */
 
-    /** Last modified timestamp in ISO 8601 format. */
-    lastModified: string;
+export interface TechnicalAudioInfo {
+    codec: string;
+    codecLongName: string;
+    containerFormat: string;
+    containerLongName: string;
+    duration: number;
+    bitrate: number;
+    sampleRate: number;
+    channels: number;
+    channelLayout?: string;
+    bitsPerSample?: number;
+    isLossless: boolean;
+    hasAttachedPicture: boolean;
+    streamCount: number;
+    rawStreams?: unknown[];
+    rawFormat?: unknown;
+}
 
-    /** Normalized audio tags. */
-    tags: AudioTags;
-
-    /** Technical audio specifications from FFprobe. */
-    technical: TechnicalAudioInfo;
-
-    /** Cached album artwork details, when available. */
-    artwork?: ExtractedArtwork | null;
-
-    /** Raw ExifTool tag dictionary. */
-    rawExifToolMetadata: Record<string, unknown>;
-
-    /** Raw FFprobe response. */
-    rawFFprobeMetadata: {
-        format?: Record<string, unknown>;
-        streams?: unknown[];
+export interface MediaInfoQC {
+    format: string;
+    bitrateMode?: BitrateMode;
+    overallBitrate?: number;
+    maximumBitrate?: number;
+    bitDepth?: number;
+    compressionMode?: string;
+    encodedLibrary?: string;
+    encodedLibrarySettings?: string;
+    delay?: number;
+    padding?: number;
+    replayGain?: {
+        trackGain?: number;
+        trackPeak?: number;
+        albumGain?: number;
+        albumPeak?: number;
     };
+    rawTracks?: unknown[];
 }
 
-/**
- * Options for reading audio file metadata through the coordinator.
- */
+/* ------------------------ Unified Metadata Models ------------------------- */
+
+export interface CombinedAudioMetadata {
+    filePath: string;
+    fileSizeBytes: number;
+    lastModified: string;
+    tags: AudioTags;
+    technical: TechnicalAudioInfo;
+    qc?: MediaInfoQC | null;
+    artwork?: ExtractedArtwork | null;
+    rawTagMetadata?: Record<string, unknown>;
+    rawFFprobeMetadata?: unknown;
+    rawMediaInfoMetadata?: unknown;
+}
+
+export interface BatchMetadataResponse {
+    total: number;
+    results: Record<string, CombinedAudioMetadata>;
+}
+
 export interface ReadAudioOptions {
-    /** Extract and cache embedded album artwork. Defaults to true. */
     extractArtwork?: boolean;
-
-    /** Re-extract artwork even when a cached copy exists. Defaults to false. */
     forceArtworkRefresh?: boolean;
-
-    /** Include raw FFprobe and ExifTool payloads. Defaults to true. */
+    includeQC?: boolean;
     includeRawPayload?: boolean;
 }
 
-/**
- * Options for writing tags to an audio file.
- */
-export interface TagWriteOptions {
-    /** Keep ExifTool's `_original` backup. Defaults to false. */
-    preserveOriginal?: boolean;
+/* --------------------------- Tag Writing Models --------------------------- */
 
-    /** Preserve the file modification timestamp. Defaults to true. */
-    preserveFileTimestamp?: boolean;
+export interface TagWriteOptions {
+    preserveOriginal?: boolean;
 }
 
-/**
- * Result of writing tags to an audio file on success.
- */
 export interface TagWriteResult {
-    success: true;
     filePath: string;
     backupPath?: string;
 }
 
-/**
- * Target for writing tags in a batch operation.
- */
-export interface BatchTagWriteTarget {
-    path: string;
-    tags: Record<string, ExifTagValue>;
-}
-
-/**
- * Details of a failed tag write for an individual file in a batch.
- */
 export interface BatchTagWriteFailure {
     filePath: string;
     error: string;
 }
 
-/**
- * Result of a batch tag write operation.
- */
 export interface BatchTagWriteResult {
     total: number;
     succeeded: TagWriteResult[];
     failed: BatchTagWriteFailure[];
+}
+
+/* -------------------------- Audio Conversion Models ----------------------- */
+
+export interface ConversionOptions {
+    outputPath?: string;
+    targetFormat: ConversionTargetFormat;
+    bitrate?: string;
+    sampleRate?: number;
+    bitDepth?: 16 | 24 | 32;
+    channels?: 1 | 2;
+    downmixStereo?: boolean;
+    resampler?: 'soxr';
+    ditherMethod?: 'triangular' | 'lipshitz';
+    applyNormalization?: boolean;
+}
+
+export interface ConversionProgress {
+    percent: number;
+    currentTimeSeconds: number;
+    speed: string;
+    fps: number;
+    bitRateKbps: number;
+}
+
+export type ConversionProgressCallback = (progress: ConversionProgress) => void;
+
+export interface ConversionResult {
+    inputPath: string;
+    outputPath: string;
+    targetFormat: ConversionTargetFormat;
+    sizeBytes: number;
+    duration: number;
 }

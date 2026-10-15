@@ -1,0 +1,43 @@
+meta {
+  name: Convert Audio - Transcode to Opus (201)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/media/convert
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "inputPath": "{{sampleAudioPathFlac}}",
+    "targetFormat": "opus",
+    "bitrate": "160k"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.success: eq true
+  res.body.data.targetFormat: eq "opus"
+  res.body.data.outputPath: isDefined
+}
+
+tests {
+  test("transcodes audio to Opus at 160k", function() {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.targetFormat).to.equal("opus");
+  });
+}

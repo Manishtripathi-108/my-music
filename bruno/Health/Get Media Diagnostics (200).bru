@@ -1,0 +1,45 @@
+meta {
+  name: Get Media Diagnostics (200)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/health/media
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.status: isDefined
+  res.body.data.engines: isDefined
+  res.body.data.engines.metadata.tools.taglib: isDefined
+  res.body.data.engines.metadata.tools.taglib.implementations.native: isDefined
+  res.body.data.engines.metadata.tools.taglib.implementations.wasm: isDefined
+  res.body.data.engines.probing.tools.ffprobe.implementations.native: isDefined
+  res.body.data.engines.probing.tools.ffprobe.implementations.wasm: isDefined
+  res.body.data.engines.probing.tools.mediaInfo.implementations.native: isDefined
+  res.body.data.engines.probing.tools.mediaInfo.implementations.wasm: isDefined
+  res.body.data.engines.conversion.tools.ffmpeg.implementations.native: isDefined
+  res.body.data.engines.conversion.tools.ffmpeg.implementations.wasm: isDefined
+  res.body.data.warnings: isDefined
+  res.body.data.timestamp: isDefined
+}
+
+tests {
+  test("should return 200 with media engine diagnostics", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.status).to.be.oneOf(['healthy', 'degraded', 'unhealthy']);
+    expect(res.getBody().data.engines.metadata.tools.taglib.active).to.be.oneOf(['native', 'wasm']);
+    expect(res.getBody().data.engines.probing.tools.ffprobe.configured).to.be.oneOf(['native', 'wasm']);
+    expect(res.getBody().data.engines.conversion.tools.ffmpeg.configured).to.be.oneOf(['native', 'wasm']);
+    expect(Array.isArray(res.getBody().data.warnings)).to.be.true;
+  });
+}

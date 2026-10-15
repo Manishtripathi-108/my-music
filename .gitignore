@@ -66,3 +66,34 @@ public/swe-worker*
 **/.cache
 /cache/
 /art/
+/music-files/
+
+# Crash-safe atomic write temporaries and original backups
+.*.tmp_*
+*_original
+
+# Native TagLib worker sidecar build artifacts
+/scripts/taglib-worker/build/
+/scripts/taglib-worker/taglib-worker.exe
+/scripts/taglib-worker/taglib-worker
+
+# CMake & native compilation outputs
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.vcxproj*
+*.sln
+*.dir/
+*.tlog/
+*.obj
+*.o
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.a
+
+# IDE & OS
+.idea
+*.suo
+*.user

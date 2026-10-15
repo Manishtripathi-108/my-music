@@ -1,0 +1,41 @@
+meta {
+  name: Get Technical Info - With MediaInfo QC (200)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/media/technical?path={{sampleAudioPathFlac}}&includeQC=true
+  body: none
+  auth: bearer
+}
+
+params:query {
+  path: {{sampleAudioPathFlac}}
+  includeQC: true
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.data.technical: isDefined
+  res.body.data.technical.codec: isDefined
+  res.body.data.qc: isDefined
+}
+
+tests {
+  test("returns technical stream properties and forensic MediaInfo QC", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.technical).to.be.an('object');
+    expect(res.getBody().data.qc).to.be.an('object');
+  });
+}

@@ -23,7 +23,7 @@ body:json {
   {
     "path": "{{sampleAudioPath}}",
     "tags": {
-      "Comment": "Backup preserved test"
+      "comment": "Backup preserved test"
     },
     "preserveOriginal": true
   }
@@ -32,7 +32,7 @@ body:json {
 assert {
   res.status: eq 200
   res.body.success: eq true
-  res.body.data.success: eq true
+  res.body.data.filePath: isDefined
   res.body.data.backupPath: isDefined
 }
 
@@ -40,6 +40,7 @@ tests {
   test("should write tags preserving original backup file", function() {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().success).to.be.true;
+    expect(res.getBody().data.filePath).to.be.a('string');
     expect(res.getBody().data.backupPath).to.be.a('string');
   });
 }

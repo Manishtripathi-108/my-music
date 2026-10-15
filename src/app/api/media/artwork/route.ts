@@ -2,9 +2,14 @@ import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { NextResponse } from 'next/server';
 
-import { type ExtractedArtwork, artworkExtractRequestSchema, artworkQuerySchema } from '@/features/media';
-import { apiNotFound, apiSuccess, handleRouteError } from '@/server/api';
-import { getMetaReader } from '@/server/media';
+import {
+    artworkExtractRequestSchema,
+    artworkQuerySchema,
+    tagsQuerySchema,
+    type ExtractedArtwork,
+} from '@/features/media';
+import { metadataCoordinator } from '@/features/media/server';
+import { apiNoContent, apiNotFound, apiSuccess, handleRouteError } from '@/server/api';
 
 /* ---------------------- Stream Artwork Binary (GET) ----------------------- */
 
@@ -13,8 +18,7 @@ import { getMetaReader } from '@/server/media';
  * or
  * GET /api/media/artwork?path=/path/to/song.mp3
  *
- * Streams cached artwork directly as binary image.
- * Sets high-efficiency HTTP caching headers.
+ * Streams cached artwork directly as binary image with HTTP caching headers.
  */
 export async function GET(request: Request): Promise<NextResponse | Response> {
     try {
@@ -24,7 +28,7 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
             file: searchParams.get('file') ?? undefined,
         });
 
-        const artwork: ExtractedArtwork | null = await getMetaReader().findArtwork(query);
+        const artwork: ExtractedArtwork | null = await metadataCoordinator.findArtwork(query);
 
         if (!artwork) {
             return apiNotFound('No album artwork available for the specified query');
@@ -53,15 +57,15 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
  * POST /api/media/artwork
  * Body: { path: string, forceRefresh?: boolean }
  *
- * Extracts embedded artwork from an audio file, persists it to disk cache (cache/art),
- * and returns JSON metadata regarding the extracted cover.
+ * Extracts embedded artwork from an audio file, persists it to disk cache,
+ * and returns JSON metadata.
  */
 export async function POST(request: Request): Promise<NextResponse> {
     try {
         const body = await request.json();
         const input = artworkExtractRequestSchema.parse(body);
 
-        const artwork: ExtractedArtwork | null = await getMetaReader().extractArtwork(
+        const artwork: ExtractedArtwork | null = await metadataCoordinator.extractArtwork(
             input.path,
             input.forceRefresh
         );
@@ -75,5 +79,25 @@ export async function POST(request: Request): Promise<NextResponse> {
         });
     } catch (error) {
         return handleRouteError(error, 'Failed to extract album artwork');
+    }
+}
+
+/* --------------------- Remove Artwork Picture (DELETE) -------------------- */
+
+/**
+ * DELETE /api/media/artwork?path=/path/to/song.mp3
+ * Removes embedded artwork from the audio file and purges cache.
+ */
+export async function DELETE(request: Request): Promise<NextResponse> {
+    try {
+        const { searchParams } = new URL(request.url);
+        const { path } = tagsQuerySchema.parse({
+            path: searchParams.get('path') ?? undefined,
+        });
+
+        await metadataCoordinator.removeArtwork(path);
+        return apiNoContent();
+    } catch (error) {
+        return handleRouteError(error, 'Failed to remove album artwork');
     }
 }

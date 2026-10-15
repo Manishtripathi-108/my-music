@@ -1,0 +1,33 @@
+meta {
+  name: Remove Artwork - Missing Path (422)
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{baseUrl}}/api/media/artwork
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+assert {
+  res.status: eq 422
+  res.body.success: eq false
+  res.body.error.code: eq VALIDATION_ERROR
+}
+
+tests {
+  test("should return 422 when path param is omitted", function() {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().success).to.be.false;
+    expect(res.getBody().error.code).to.equal("VALIDATION_ERROR");
+  });
+}

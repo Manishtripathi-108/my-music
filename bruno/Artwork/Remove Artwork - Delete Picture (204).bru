@@ -1,0 +1,33 @@
+meta {
+  name: Remove Artwork - Delete Picture (204)
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{baseUrl}}/api/media/artwork?path={{sampleAudioPathFlac}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  path: {{sampleAudioPathFlac}}
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+assert {
+  res.status: in [200, 204]
+}
+
+tests {
+  test("should successfully remove artwork", function() {
+    expect([200, 204]).to.include(res.getStatus());
+  });
+}

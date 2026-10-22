@@ -31,17 +31,7 @@ export const scanAudioExtensionSchema = z.enum(SCAN_AUDIO_EXTENSIONS);
  * - Lossless: flac, alac, wav, aiff, wv
  * - Lossy: mp3, opus, aac, ogg
  */
-export const CONVERSION_TARGET_FORMATS = [
-    'mp3',
-    'flac',
-    'opus',
-    'aac',
-    'alac',
-    'wav',
-    'aiff',
-    'ogg',
-    'wv',
-] as const;
+export const CONVERSION_TARGET_FORMATS = ['mp3', 'flac', 'opus', 'aac', 'alac', 'wav', 'aiff', 'ogg', 'wv'] as const;
 
 export type ConversionTargetFormat = (typeof CONVERSION_TARGET_FORMATS)[number];
 export const conversionTargetFormatSchema = z.enum(CONVERSION_TARGET_FORMATS);
@@ -98,4 +88,3 @@ export function parseBitrateMode(val: unknown): BitrateMode | undefined {
     if (raw.includes('CBR') || raw.includes('CONSTANT')) return 'CBR';
     return undefined;
 }
-

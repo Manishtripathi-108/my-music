@@ -1,13 +1,9 @@
-import fs from 'node:fs';
-import { Readable } from 'node:stream';
 import { NextResponse } from 'next/server';
 
-import {
-    artworkExtractRequestSchema,
-    artworkQuerySchema,
-    tagsQuerySchema,
-    type ExtractedArtwork,
-} from '@/features/media';
+import fs from 'node:fs';
+import { Readable } from 'node:stream';
+
+import { type ExtractedArtwork, artworkExtractRequestSchema, artworkQuerySchema, tagsQuerySchema } from '@/features/media';
 import { metadataCoordinator } from '@/features/media/server';
 import { apiNoContent, apiNotFound, apiSuccess, handleRouteError } from '@/server/api';
 
@@ -65,10 +61,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         const body = await request.json();
         const input = artworkExtractRequestSchema.parse(body);
 
-        const artwork: ExtractedArtwork | null = await metadataCoordinator.extractArtwork(
-            input.path,
-            input.forceRefresh
-        );
+        const artwork: ExtractedArtwork | null = await metadataCoordinator.extractArtwork(input.path, input.forceRefresh);
 
         if (!artwork) {
             return apiNotFound('No embedded artwork found in this audio file');

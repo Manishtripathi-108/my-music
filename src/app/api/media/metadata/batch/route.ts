@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import {
-    type BatchMetadataResponse,
-    type CombinedAudioMetadata,
-    batchMetadataRequestSchema,
-} from '@/features/media';
+import { type BatchMetadataResponse, type CombinedAudioMetadata, batchMetadataRequestSchema } from '@/features/media';
 import { metadataCoordinator } from '@/features/media/server';
 import { apiSuccess, handleRouteError } from '@/server/api';
 

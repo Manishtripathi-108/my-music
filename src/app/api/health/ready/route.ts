@@ -1,5 +1,6 @@
-import fs from 'node:fs';
 import type { NextResponse } from 'next/server';
+
+import fs from 'node:fs';
 
 import { serverEnv } from '@/config/env.server';
 import { apiSuccess, handleRouteError } from '@/server/api';
@@ -21,13 +22,15 @@ export interface ReadinessHealthData {
 export async function GET(): Promise<NextResponse<ApiResponse<ReadinessHealthData>>> {
     try {
         const roots = serverEnv.ALLOWED_MEDIA_ROOTS;
-        const storageReady = roots.length > 0 && roots.some((root) => {
-            try {
-                return fs.existsSync(root);
-            } catch {
-                return false;
-            }
-        });
+        const storageReady =
+            roots.length > 0 &&
+            roots.some((root) => {
+                try {
+                    return fs.existsSync(root);
+                } catch {
+                    return false;
+                }
+            });
 
         const isReady = storageReady;
 

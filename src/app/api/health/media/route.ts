@@ -1,7 +1,7 @@
 import type { NextResponse } from 'next/server';
 
-import { getMediaDiagnostics, type MediaDiagnosticsReport } from '@/server/media/media-diagnostics';
 import { apiSuccess, handleRouteError } from '@/server/api';
+import { type MediaDiagnosticsReport, getMediaDiagnostics } from '@/server/media/media-diagnostics';
 import type { ApiResponse } from '@/types/api';
 
 /**

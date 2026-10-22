@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import {
-    type AudioTags,
-    type TagWriteResult,
-    tagsQuerySchema,
-    writeTagsRequestSchema,
-} from '@/features/media';
+import { type AudioTags, type TagWriteResult, tagsQuerySchema, writeTagsRequestSchema } from '@/features/media';
 import { metadataCoordinator } from '@/features/media/server';
 import { apiSuccess, handleRouteError } from '@/server/api';
 

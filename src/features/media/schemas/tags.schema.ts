@@ -1,24 +1,14 @@
 import { z } from 'zod';
 
+import { filePathSchema, writeAudioTagsSchema } from '@/lib/media';
+
 export const tagsQuerySchema = z.object({
-    path: z
-        .string()
-        .trim()
-        .min(1, 'Audio file path is required')
-        .transform((val) => val.replace(/\\+/g, '/')),
+    path: filePathSchema,
 });
 
 export const writeTagsRequestSchema = z.object({
-    path: z
-        .string()
-        .trim()
-        .min(1, 'Audio file path is required')
-        .transform((val) => val.replace(/\\+/g, '/')),
-    tags: z
-        .record(z.string().min(1, 'Tag name cannot be empty'), z.union([z.string(), z.number(), z.array(z.string()), z.null()]))
-        .refine((data) => Object.keys(data).length > 0, {
-            message: 'At least one tag key-value pair must be specified',
-        }),
+    path: filePathSchema,
+    tags: writeAudioTagsSchema,
     preserveOriginal: z.boolean().default(false),
 });
 
@@ -26,16 +16,8 @@ export const batchWriteTagsRequestSchema = z.object({
     targets: z
         .array(
             z.object({
-                path: z
-                    .string()
-                    .trim()
-                    .min(1, 'Target file path is required')
-                    .transform((val) => val.replace(/\\+/g, '/')),
-                tags: z
-                    .record(z.string().min(1, 'Tag name cannot be empty'), z.union([z.string(), z.number(), z.array(z.string()), z.null()]))
-                    .refine((data) => Object.keys(data).length > 0, {
-                        message: 'Target must have at least one tag to write',
-                    }),
+                path: filePathSchema,
+                tags: writeAudioTagsSchema,
             })
         )
         .min(1, 'At least one write target is required')

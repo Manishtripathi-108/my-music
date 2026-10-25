@@ -1,21 +1,15 @@
 import { z } from 'zod';
 
+import { filePathSchema } from '@/lib/media';
+
 export const artworkExtractRequestSchema = z.object({
-    path: z
-        .string()
-        .trim()
-        .min(1, 'Audio file path is required')
-        .transform((val) => val.replace(/\\+/g, '/')),
+    path: filePathSchema,
     forceRefresh: z.boolean().default(false),
 });
 
 export const artworkQuerySchema = z
     .object({
-        path: z
-            .string()
-            .trim()
-            .optional()
-            .transform((val) => (val ? val.replace(/\\+/g, '/') : undefined)),
+        path: filePathSchema.optional(),
         file: z.string().trim().optional(),
     })
     .refine((data) => Boolean(data.path || data.file), {

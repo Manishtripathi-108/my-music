@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { filePathSchema } from '@/lib/media';
 
 export const scanModeEnum = z.enum(['addNew', 'forceAll', 'rescanErrors']);

@@ -1,24 +1,15 @@
 import { z } from 'zod';
 
+import { filePathSchema, filePathsArraySchema } from '@/lib/media';
+
 export const singleMetadataQuerySchema = z.object({
-    path: z
-        .string()
-        .trim()
-        .min(1, 'Audio file path is required')
-        .transform((val) => val.replace(/\\+/g, '/')),
+    path: filePathSchema,
+    includeQC: z.union([z.boolean(), z.string().transform((v) => v === 'true' || v === '1')]).default(false),
+    raw: z.union([z.boolean(), z.string().transform((v) => v === 'true' || v === '1')]).default(false),
 });
 
 export const batchMetadataRequestSchema = z.object({
-    paths: z
-        .array(
-            z
-                .string()
-                .trim()
-                .min(1, 'File path cannot be empty')
-                .transform((val) => val.replace(/\\+/g, '/'))
-        )
-        .min(1, 'At least one file path is required')
-        .max(500, 'Batch size cannot exceed 500 files'),
+    paths: filePathsArraySchema,
 });
 
 export type SingleMetadataQuery = z.infer<typeof singleMetadataQuerySchema>;

@@ -1,7 +1,7 @@
-import { compactKey } from '@/lib/a';
+import { compactKey } from '@/lib/compact-key';
 import { convertDate } from '@/lib/format';
-import { getFieldKeys, isKnownTagLibProperty, parseFieldValue, TAG_FIELDS } from '@/lib/media/tag-lib23';
-import { AudioTags, AudioTagsSchema, customTagNameSchema, WriteAudioTagsSchema } from '@/lib/media/tags.schema copy';
+import { getFieldKeys, isKnownTagLibProperty, parseFieldValue, TAG_FIELDS } from '@/lib/media/tag-registry';
+import { type AudioTags, audioTagsSchema, customTagNameSchema, writeAudioTagsSchema } from '@/lib/media/tags.schema';
 
 /* --------------------------------- Types ---------------------------------- */
 
@@ -223,7 +223,7 @@ function fromTagLibProperties(rawProperties: unknown): AudioTags {
         merged.customTags = customTags;
     }
 
-    const audioTags = AudioTagsSchema.safeParse(merged);
+    const audioTags = audioTagsSchema.safeParse(merged);
     if (!audioTags.success) {
         console.error('Failed to parse AudioTags:', audioTags.error);
         return {} as AudioTags;
@@ -233,7 +233,7 @@ function fromTagLibProperties(rawProperties: unknown): AudioTags {
 }
 
 function toTagLibProperties(input: unknown): Record<string, string[]> {
-    const patch = WriteAudioTagsSchema.parse(input);
+    const patch = writeAudioTagsSchema.parse(input);
 
     const result: Record<string, string[]> = {};
 

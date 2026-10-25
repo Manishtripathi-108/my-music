@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import 'server-only';
 import { z } from 'zod';
 
+import { isDevelopment } from '@/config/env.server';
 import { type ApiError, type ApiErrorCode, ApiErrorCodes, type ApiFieldError, type ApiMeta, type ApiSuccess } from '@/types/api';
 
 /* --------------------------- Options Interfaces --------------------------- */
@@ -204,8 +205,6 @@ export function apiInternalError(
         error: error instanceof Error ? (error.stack ?? error.message) : error,
         timestamp: new Date().toISOString(),
     });
-
-    const isDevelopment = process.env.NODE_ENV !== 'production';
 
     // In dev, expose error message for debugging; in prod, keep details strictly hidden
     const details = isDevelopment && error instanceof Error ? { debugMessage: error.message } : undefined;

@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { compactKey } from '../a';
+/**
+ * Normalizes a property key for case-insensitive, punctuation-insensitive comparison.
+ */
+export const compactKey = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]/g, '');
 import {
     booleanSchema,
     dateSchema,

@@ -39,3 +39,7 @@ if (!parsed.success) {
 
 export const serverEnv = parsed.data;
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
+
+export const isProduction = serverEnv.NODE_ENV === 'production';
+export const isDevelopment = serverEnv.NODE_ENV === 'development';
+export const isTest = serverEnv.NODE_ENV === 'test';

@@ -10,8 +10,8 @@ import { serverEnv } from '@/config/env.server';
 
 import { type ToolHealth, inspectNativeTool, resolveActiveEngine, toolHealthStatus } from '../tool-inspector';
 import type { RawPictureData, TagWriteOptions, TagWriteResult } from '../types';
-import { TagMapper } from './tag-mapper2';
-import { AudioTags, WriteAudioTags } from '@/lib/media/tags.schema copy';
+import { TagMapper } from './tag-mapper';
+import type { AudioTags, WriteAudioTags } from '@/lib/media';
 
 const execFileAsync = promisify(execFile);
 
@@ -106,7 +106,6 @@ export class TagLibAdapter {
         const configured = serverEnv.METADATA_ENGINE;
         const useNative = configured === 'native' && Boolean(serverEnv.TAGLIB_WORKER_PATH);
 
-        console.log('🪵 > taglib.adapter.ts:109 > TagLibAdapter > readTags > useNative:', useNative)
         if (useNative) {
             try {
                 const { stdout } = await execFileAsync(serverEnv.TAGLIB_WORKER_PATH!, ['--read', canonicalPath]);

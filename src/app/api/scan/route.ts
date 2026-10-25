@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 
-import { type ScanResponse, scanRequestSchema } from '@/features/scanner';
+import { scanRequestSchema, type ScanResponseData } from '@/features/scanner';
+import { initiateLibraryScan } from '@/features/scanner/server';
 import { apiAccepted, handleRouteError } from '@/server/api';
+import type { ApiResponse } from '@/types/api';
 
 /* ------------------------- Initiate Library Scan -------------------------- */
 
@@ -9,24 +11,15 @@ import { apiAccepted, handleRouteError } from '@/server/api';
  * POST /api/scan
  * Initiates a background library scan for an audio directory.
  */
-export async function POST(request: Request): Promise<NextResponse<ScanResponse>> {
+export async function POST(request: Request): Promise<NextResponse<ApiResponse<ScanResponseData>>> {
     try {
         const body = await request.json();
         const validData = scanRequestSchema.parse(body);
-        const scanId = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const result = initiateLibraryScan(validData);
 
-        return apiAccepted(
-            {
-                scanId,
-                directory: validData.directory,
-                scanMode: validData.scanMode,
-                recursive: validData.recursive,
-                timestamp: new Date().toISOString(),
-            },
-            {
-                message: `Library scan initiated successfully for "${validData.directory}"`,
-            }
-        );
+        return apiAccepted(result, {
+            message: `Library scan initiated successfully for "${validData.directory}"`,
+        });
     } catch (error) {
         return handleRouteError(error, 'Failed to initiate library scan');
     }

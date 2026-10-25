@@ -18,7 +18,7 @@ import cn from '@/lib/cn';
 import type { ApiError, ApiErrorDetail, ApiFieldError, ApiSuccess } from '@/types/api';
 
 import { type ScanMode, type ScanRequestInput, scanRequestSchema } from '../schemas/scan-request.schema';
-import { useScanModalStore } from '../stores/scan-modal.store';
+import { useScanModalStore } from '../hooks/use-scan-modal-store';
 import type { ScanResponseData } from '../types';
 
 export interface ScanModalProps {

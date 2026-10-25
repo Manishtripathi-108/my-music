@@ -1,12 +1,8 @@
-'use client';
-
 import React from 'react';
 
 import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
 import Icon from '@/components/ui/Icon';
 import ThemeToggler from '@/components/ui/ThemeToggler';
-import { useScanModalStore } from '@/features/scanner';
 import cn from '@/lib/cn';
 
 export interface TopbarProps extends React.ComponentProps<'header'> {
@@ -32,8 +28,6 @@ export function Topbar({
     children,
     ...props
 }: TopbarProps) {
-    const { openModal: openScanModal } = useScanModalStore();
-
     return (
         <header
             role="banner"
@@ -68,11 +62,6 @@ export function Topbar({
 
                 {/* Right Controls & Actions */}
                 <div className="flex items-center gap-2.5 sm:gap-3">
-                    <Button variant="outline" size="sm" onClick={openScanModal} className="hidden gap-1.5 sm:inline-flex">
-                        <Icon icon="refresh" className="size-3.5" />
-                        <span>Scan Library</span>
-                    </Button>
-
                     {actions}
 
                     {/* Theme Toggler */}

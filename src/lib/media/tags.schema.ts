@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
-import { compactKey } from '../a';
 import { listSchema, numberSchema, textSchema } from '../schema';
-import { isKnownTagLibProperty, TAG_FIELDS } from './tag-lib23';
+import { compactKey, isKnownTagLibProperty, TAG_FIELDS } from './tag-registry';
 
 type TagField = (typeof TAG_FIELDS)[number];
 
@@ -24,16 +23,16 @@ export const customTagNameSchema = textSchema
 
 export const customTagValueSchema = z.union([z.boolean(), numberSchema, listSchema, textSchema]);
 
-export const AudioTagsSchema = z
+export const audioTagsSchema = z
     .strictObject({
         ...tagShape,
         customTags: z.record(customTagNameSchema, customTagValueSchema),
     })
     .partial();
 
-export type AudioTags = z.infer<typeof AudioTagsSchema>;
+export type AudioTags = z.infer<typeof audioTagsSchema>;
 
-export const WriteAudioTagsSchema = z
+export const writeAudioTagsSchema = z
     .strictObject({
         ...nullableTagShape,
         customTags: z
@@ -65,4 +64,4 @@ export const WriteAudioTagsSchema = z
     })
     .partial();
 
-export type WriteAudioTags = z.infer<typeof WriteAudioTagsSchema>;
+export type WriteAudioTags = z.infer<typeof writeAudioTagsSchema>;

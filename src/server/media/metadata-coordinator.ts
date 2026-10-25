@@ -7,7 +7,7 @@ import sharp from 'sharp';
 
 import { serverEnv } from '@/config/env.server';
 import type { WriteAudioTags } from '@/lib/media';
-import { BadRequestError } from '@/server/api/errors';
+import { BadRequestError } from '@/server/api';
 
 import { FFprobeAdapter } from './adapters/ffprobe.adapter';
 import { MediaInfoAdapter } from './adapters/mediainfo.adapter';

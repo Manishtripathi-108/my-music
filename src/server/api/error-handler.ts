@@ -3,10 +3,11 @@ import { NextResponse } from 'next/server';
 import 'server-only';
 import { z } from 'zod';
 
+import { isDevelopment } from '@/config/env.server';
 import type { ApiError } from '@/types/api';
 
-import { BadRequestError, ForbiddenError, NotFoundError } from './errors';
-import { apiBadRequest, apiForbidden, apiInternalError, apiNotFound, apiValidationError } from './response';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from './errors';
+import { apiBadRequest, apiConflict, apiForbidden, apiInternalError, apiNotFound, apiValidationError } from './response';
 
 /* --------------------- Universal Route Error Handler ---------------------- */
 
@@ -31,28 +32,24 @@ export function handleRouteError(error: unknown, fallbackMessage = 'Internal ser
         return apiForbidden(error.message);
     }
 
-    // 4. Explicit bad request -> 400 Bad Request
+    // 4. Conflict / State conflict or duplicate -> 409 Conflict
+    if (error instanceof ConflictError) {
+        return apiConflict(error.message);
+    }
+
+    // 5. Explicit bad request -> 400 Bad Request
     if (error instanceof BadRequestError) {
         return apiBadRequest(error.message);
     }
 
-    // 4. JSON parsing / syntax error in request body -> 400 Bad Request
+    // 6. JSON parsing / syntax error in request body -> 400 Bad Request
     if (error instanceof SyntaxError) {
-        const isDev = process.env.NODE_ENV !== 'production';
-        const msg = isDev
+        const msg = isDevelopment
             ? `Invalid JSON in request body: ${error.message}. Note: if passing Windows paths in JSON, use forward slashes ('/') or escape backslashes ('\\\\').`
             : 'Invalid JSON payload in request body';
         return apiBadRequest(msg, { code: 'BAD_REQUEST' });
     }
 
-    // 5. Conventional "not found" / "does not exist" Error messages -> 404 Not Found
-    if (error instanceof Error) {
-        const lower = error.message.toLowerCase();
-        if (lower.includes('does not exist') || lower.includes('not found') || lower.includes('no such file')) {
-            return apiNotFound(error.message);
-        }
-    }
-
-    // 6. Unhandled internal server error (sanitized in production) -> 500
+    // 7. Unhandled internal server error (sanitized in production) -> 500
     return apiInternalError(error, fallbackMessage);
 }

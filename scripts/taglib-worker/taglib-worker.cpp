@@ -17,6 +17,31 @@
 #define TAGLIB_WORKER_VERSION "2.0.2"
 #endif
 
+static std::string escapeJsonString(const std::string& input) {
+    std::ostringstream ss;
+    for (char c : input) {
+        switch (c) {
+            case '"': ss << "\\\""; break;
+            case '\\': ss << "\\\\"; break;
+            case '\b': ss << "\\b"; break;
+            case '\f': ss << "\\f"; break;
+            case '\n': ss << "\\n"; break;
+            case '\r': ss << "\\r"; break;
+            case '\t': ss << "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[7];
+                    snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+                    ss << buf;
+                } else {
+                    ss << c;
+                }
+                break;
+        }
+    }
+    return ss.str();
+}
+
 void printVersion() {
     std::cout << "{\"status\":\"ok\",\"engine\":\"native-worker\",\"taglibVersion\":\"" 
               << TAGLIB_WORKER_VERSION << "\",\"pinned\":true}\n";
@@ -49,12 +74,12 @@ int main(int argc, char* argv[]) {
         for (const auto& [key, valList] : properties) {
             if (!firstProp) std::cout << ",";
             firstProp = false;
-            std::cout << "\"" << key.toCString(true) << "\":[";
+            std::cout << "\"" << escapeJsonString(key.toCString(true)) << "\":[";
             bool firstVal = true;
             for (const auto& val : valList) {
                 if (!firstVal) std::cout << ",";
                 firstVal = false;
-                std::cout << "\"" << val.toCString(true) << "\"";
+                std::cout << "\"" << escapeJsonString(val.toCString(true)) << "\"";
             }
             std::cout << "]";
         }

@@ -222,13 +222,7 @@ function fromTagLibProperties(rawProperties: unknown): AudioTags {
         merged.customTags = customTags;
     }
 
-    const audioTags = audioTagsSchema.safeParse(merged);
-    if (!audioTags.success) {
-        console.error('Failed to parse AudioTags:', audioTags.error);
-        return {} as AudioTags;
-    }
-
-    return audioTags.data;
+    return audioTagsSchema.parse(merged);
 }
 
 function toTagLibProperties(input: unknown): Record<string, string[]> {

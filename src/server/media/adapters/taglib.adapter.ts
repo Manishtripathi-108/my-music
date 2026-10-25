@@ -30,6 +30,55 @@ function parseTagLibVersion(output: string): string | null {
     return null;
 }
 
+function resolveWorkerPath(configuredPath: string | undefined): string | null {
+    if (!configuredPath) return null;
+    const trimmed = configuredPath.trim();
+    if (!trimmed) return null;
+    return path.isAbsolute(trimmed) ? trimmed : path.resolve(process.cwd(), trimmed);
+}
+
+/**
+ * Resilient JSON parser for native worker stdout.
+ * If standard JSON.parse fails due to unescaped control characters within string literals
+ * (e.g. multiline lyrics or comments), sanitizes raw newlines and control codes in strings.
+ */
+function safeParseWorkerJson<T = unknown>(raw: string): T {
+    try {
+        return JSON.parse(raw) as T;
+    } catch {
+        let inString = false;
+        let escaped = false;
+        let sanitized = '';
+
+        for (let i = 0; i < raw.length; i++) {
+            const char = raw[i];
+
+            if (char === '"' && !escaped) {
+                inString = !inString;
+                sanitized += char;
+            } else if (inString) {
+                if (char === '\n') {
+                    sanitized += '\\n';
+                } else if (char === '\r') {
+                    sanitized += '\\r';
+                } else if (char === '\t') {
+                    sanitized += '\\t';
+                } else if (char.charCodeAt(0) < 0x20) {
+                    sanitized += `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+                } else {
+                    sanitized += char;
+                }
+            } else {
+                sanitized += char;
+            }
+
+            escaped = char === '\\' && !escaped;
+        }
+
+        return JSON.parse(sanitized) as T;
+    }
+}
+
 /**
  * Universal Audio Metadata Adapter powered by TagLib 2.x.
  * Executes in-process via WebAssembly (taglib-wasm) or via native worker sidecar.
@@ -41,7 +90,8 @@ export class TagLibAdapter {
      * and both native/WASM implementation statuses.
      */
     public static async getToolHealth(): Promise<ToolHealth> {
-        const native = await inspectNativeTool('taglib', serverEnv.TAGLIB_WORKER_PATH, ['--version'], parseTagLibVersion);
+        const workerPath = resolveWorkerPath(serverEnv.TAGLIB_WORKER_PATH);
+        const native = await inspectNativeTool('taglib', workerPath, ['--version'], parseTagLibVersion);
 
         const configured = serverEnv.METADATA_ENGINE;
         const active = resolveActiveEngine(configured, native.available, true);
@@ -68,35 +118,6 @@ export class TagLibAdapter {
      *
      * @param canonicalPath - Pre-authorized canonical absolute file path.
      * @returns Fully normalized AudioTags, raw properties dictionary, and primary artwork picture.
-     *
-     * @example
-     * // Input path:
-     * const result = await adapter.readTags('/music/led_zeppelin/kashmir.flac');
-     *
-     * // Desired Result:
-     * // {
-     * //     tags: {
-     * //         title: 'Kashmir',
-     * //         artists: ['Led Zeppelin'],
-     * //         album: 'Physical Graffiti',
-     * //         trackNumber: 6,
-     * //         trackTotal: 8,
-     * //         year: 1975,
-     * //         date: '1975-02-24',
-     * //         genres: ['Hard Rock'],
-     * //         customTags: {},
-     * //     },
-     * //     raw: {
-     * //         TITLE: ['Kashmir'],
-     * //         ARTIST: ['Led Zeppelin'],
-     * //         TRACKNUMBER: ['6/8'],
-     * //     },
-     * //     artwork: {
-     * //         data: <Buffer ...>,
-     * //         mimeType: 'image/jpeg',
-     * //         description: 'Front Cover',
-     * //     },
-     * // }
      */
     public async readTags(canonicalPath: string): Promise<{
         tags: AudioTags;
@@ -104,20 +125,24 @@ export class TagLibAdapter {
         artwork: RawPictureData | null;
     }> {
         const configured = serverEnv.METADATA_ENGINE;
-        const useNative = configured === 'native' && Boolean(serverEnv.TAGLIB_WORKER_PATH);
+        const workerPath = resolveWorkerPath(serverEnv.TAGLIB_WORKER_PATH);
+        const useNative = configured === 'native' && Boolean(workerPath);
 
-        if (useNative) {
+        if (useNative && workerPath) {
             try {
-                const { stdout } = await execFileAsync(serverEnv.TAGLIB_WORKER_PATH!, ['--read', canonicalPath]);
-                const parsed = JSON.parse(stdout);
+                const { stdout } = await execFileAsync(workerPath, ['--read', canonicalPath]);
+                const parsed = safeParseWorkerJson<{ success?: boolean; properties?: Record<string, unknown> }>(stdout);
 
                 if (parsed.success && parsed.properties) {
-                    const raw = parsed.properties as Record<string, unknown>;
+                    const raw = parsed.properties;
                     const tags = TagMapper.fromTagLibProperties(raw);
                     return { tags, raw, artwork: null };
                 }
-            } catch {
-                // Fall through to WASM
+            } catch (error) {
+                console.warn(
+                    '[TagLibAdapter] Native worker failed to read tags, falling back to WASM:',
+                    error instanceof Error ? error.message : error
+                );
             }
         }
 
@@ -142,6 +167,26 @@ export class TagLibAdapter {
             : null;
 
         return { tags, raw, artwork };
+    }
+
+    /**
+     * Extracts embedded artwork from an audio file via TagLib WASM.
+     */
+    public async readArtwork(canonicalPath: string): Promise<RawPictureData | null> {
+        try {
+            const fileBuffer = await fs.promises.readFile(canonicalPath);
+            const pictures = await readPictures(fileBuffer);
+            if (!pictures || pictures.length === 0) return null;
+
+            const primary = pictures.find((p) => p.type === 'FrontCover') ?? pictures[0];
+            return {
+                data: Buffer.from(primary.data),
+                mimeType: primary.mimeType || 'image/jpeg',
+                description: primary.description,
+            };
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -192,6 +237,8 @@ export class TagLibAdapter {
 
         const fileBuffer = await fs.promises.readFile(canonicalPath);
         const plan = TagMapper.toTagLibProperties(tags);
+        console.log('🪵 > taglib.adapter.ts:195 > TagLibAdapter > writeTags > tags:', tags)
+        console.log('🪵 > taglib.adapter.ts:195 > TagLibAdapter > writeTags > plan:', plan)
 
         // TagLib client write boundary:
         // - Empty string list values ([]): translated to property removal / erase

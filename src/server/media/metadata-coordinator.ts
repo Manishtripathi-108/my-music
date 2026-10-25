@@ -264,21 +264,26 @@ export class MetadataCoordinator {
         }
 
         const tagResult = await this.taglib.readTags(canonicalPath);
-        if (!tagResult.artwork || !tagResult.artwork.data || tagResult.artwork.data.length === 0) {
+        let artworkData = tagResult.artwork;
+        if (!artworkData?.data || artworkData.data.length === 0) {
+            artworkData = await this.taglib.readArtwork(canonicalPath);
+        }
+
+        if (!artworkData || !artworkData.data || artworkData.data.length === 0) {
             return null;
         }
 
-        const { width, height, mimeType } = await getImageMetadata(tagResult.artwork.data);
+        const { width, height, mimeType } = await getImageMetadata(artworkData.data);
         const ext = mimeType === 'image/png' ? 'png' : 'jpg';
         const destination = path.join(/*turbopackIgnore: true*/ this.cacheDir, `${cacheKey}.${ext}`);
 
-        await fs.promises.writeFile(/*turbopackIgnore: true*/ destination, tagResult.artwork.data);
+        await fs.promises.writeFile(/*turbopackIgnore: true*/ destination, artworkData.data);
 
         return {
             cachedPath: destination,
             filename: `${cacheKey}.${ext}`,
             mimeType,
-            sizeBytes: tagResult.artwork.data.length,
+            sizeBytes: artworkData.data.length,
             width,
             height,
         };

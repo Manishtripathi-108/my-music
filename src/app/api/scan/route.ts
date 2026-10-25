@@ -1,7 +1,6 @@
 import type { NextResponse } from 'next/server';
 
 import { scanRequestSchema, type ScanResponseData } from '@/features/scanner';
-import { initiateLibraryScan } from '@/features/scanner/server';
 import { apiAccepted, handleRouteError } from '@/server/api';
 import type { ApiResponse } from '@/types/api';
 
@@ -15,11 +14,20 @@ export async function POST(request: Request): Promise<NextResponse<ApiResponse<S
     try {
         const body = await request.json();
         const validData = scanRequestSchema.parse(body);
-        const result = initiateLibraryScan(validData);
+        const scanId = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-        return apiAccepted(result, {
-            message: `Library scan initiated successfully for "${validData.directory}"`,
-        });
+        return apiAccepted(
+            {
+                scanId,
+                directory: validData.directory,
+                scanMode: validData.scanMode,
+                recursive: validData.recursive,
+                timestamp: new Date().toISOString(),
+            },
+            {
+                message: `Library scan initiated successfully for "${validData.directory}"`,
+            }
+        );
     } catch (error) {
         return handleRouteError(error, 'Failed to initiate library scan');
     }

@@ -1,6 +1,5 @@
-import { compactKey } from '@/lib/compact-key';
 import { convertDate } from '@/lib/format';
-import { getFieldKeys, isKnownTagLibProperty, parseFieldValue, TAG_FIELDS } from '@/lib/media/tag-registry';
+import { compactKey, getFieldKeys, isKnownTagLibProperty, parseFieldValue, TAG_FIELDS } from '@/lib/media/tag-registry';
 import { type AudioTags, audioTagsSchema, customTagNameSchema, writeAudioTagsSchema } from '@/lib/media/tags.schema';
 
 /* --------------------------------- Types ---------------------------------- */

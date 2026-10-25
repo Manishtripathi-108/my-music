@@ -6,7 +6,15 @@ import { constants } from 'node:fs';
 import { serverEnv } from '@/config/env.server';
 import { apiSuccess, handleRouteError } from '@/server/api';
 import type { ApiResponse } from '@/types/api';
-import type { ReadinessHealthData } from '@/types/health';
+
+export interface ReadinessHealthData {
+    status: 'ready' | 'unready';
+    checks: {
+        configuration: 'ready' | 'failed';
+        storage: 'ready' | 'failed';
+    };
+    timestamp: string;
+}
 
 /**
  * GET /api/health/ready

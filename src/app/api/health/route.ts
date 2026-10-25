@@ -2,7 +2,12 @@ import type { NextResponse } from 'next/server';
 
 import { apiSuccess } from '@/server/api';
 import type { ApiResponse } from '@/types/api';
-import type { LivenessHealthData } from '@/types/health';
+
+export interface LivenessHealthData {
+    status: 'ok';
+    uptime: number;
+    timestamp: string;
+}
 
 /**
  * GET /api/health

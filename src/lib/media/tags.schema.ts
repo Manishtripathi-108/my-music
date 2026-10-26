@@ -41,7 +41,6 @@ export const writeAudioTagsSchema = z
                 const seen = new Map<string, string>();
 
                 for (const key of Object.keys(tags)) {
-                    // Known audio properties are handled by the standard fields.
                     if (isKnownTagLibProperty(key)) continue;
 
                     const normalizedKey = compactKey(key);
@@ -53,7 +52,6 @@ export const writeAudioTagsSchema = z
                             path: [key],
                             message: `Duplicate custom tag name "${key}" conflicts with "${existingKey}".`,
                         });
-
                         continue;
                     }
 
@@ -62,6 +60,21 @@ export const writeAudioTagsSchema = z
             })
             .nullable(),
     })
-    .partial();
+    .partial()
+    .superRefine((data, ctx) => {
+        const hasStandardChanges = TAG_FIELDS.some(({ field }) => data[field] !== undefined);
+
+        const customTags = data.customTags;
+
+        const hasCustomChanges =
+            customTags === null || (customTags !== undefined && Object.keys(customTags).some((key) => !isKnownTagLibProperty(key)));
+
+        if (!hasStandardChanges && !hasCustomChanges) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'At least one audio tag change must be provided.',
+            });
+        }
+    });
 
 export type WriteAudioTags = z.infer<typeof writeAudioTagsSchema>;

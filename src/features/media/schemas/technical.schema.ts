@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
 import { filePathSchema } from '@/lib/media';
+import { booleanSchema } from '@/lib/schema';
 
 export const technicalQuerySchema = z.object({
     path: filePathSchema,
-    includeQC: z.union([z.boolean(), z.string().transform((val) => val === 'true' || val === '1')]).default(false),
+    includeQC: booleanSchema.default(false),
 });
 
 export type TechnicalQuery = z.infer<typeof technicalQuerySchema>;

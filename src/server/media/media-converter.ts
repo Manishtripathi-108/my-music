@@ -9,7 +9,7 @@ import { clamp, parseFloatNumber, parseOptionalNumber } from '@/lib/number';
 
 import { FFprobeAdapter } from './adapters/ffprobe.adapter';
 import { authorizeInputPath, authorizeOutputPath } from './path-security';
-import { type ToolHealth, inspectNativeTool, resolveActiveEngine, toolHealthStatus } from './tool-inspector';
+import { type ToolHealth, evaluateToolHealth } from './tool-inspector';
 import type { ConversionOptions, ConversionProgress, ConversionProgressCallback, ConversionResult } from './types';
 
 /**
@@ -30,25 +30,13 @@ export class MediaConverter {
      * Returns health diagnostics for this adapter.
      */
     public static async getToolHealth(): Promise<ToolHealth> {
-        const native = await inspectNativeTool(
+        return evaluateToolHealth(
             'ffmpeg',
             serverEnv.FFMPEG_PATH,
             ['-version'],
-            (output) => output.match(/ffmpeg version\s+([^\s,]+)/i)?.[1] ?? null
+            (output) => output.match(/ffmpeg version\s+([^\s,]+)/i)?.[1] ?? null,
+            serverEnv.CONVERSION_ENGINE
         );
-
-        const configured = serverEnv.CONVERSION_ENGINE;
-        const active = resolveActiveEngine(configured, native.available, true);
-
-        return {
-            configured,
-            active,
-            implementations: {
-                native,
-                wasm: { available: true },
-            },
-            status: toolHealthStatus(configured, active, native.available, true),
-        };
     }
 
     /**

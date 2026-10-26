@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 import { filePathSchema, filePathsArraySchema } from '@/lib/media';
+import { booleanSchema } from '@/lib/schema';
 
 export const singleMetadataQuerySchema = z.object({
     path: filePathSchema,
-    includeQC: z.union([z.boolean(), z.string().transform((v) => v === 'true' || v === '1')]).default(false),
-    raw: z.union([z.boolean(), z.string().transform((v) => v === 'true' || v === '1')]).default(false),
+    includeQC: booleanSchema.default(false),
+    raw: booleanSchema.default(false),
 });
 
 export const batchMetadataRequestSchema = z.object({

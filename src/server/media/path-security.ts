@@ -39,16 +39,7 @@ function assertInsideAllowedRoots(canonicalPath: string): void {
     }
 }
 
-/**
- * Validates, canonicalizes, and authorizes an input audio file path.
- *
- * @param rawPath - Client-supplied file path string.
- * @returns Canonical, realpath-resolved absolute path.
- * @throws BadRequestError on null bytes, reserved names, or non-file paths.
- * @throws NotFoundError if the file does not exist on disk.
- * @throws ForbiddenError if the file lies outside ALLOWED_MEDIA_ROOTS.
- */
-export async function authorizeInputPath(rawPath: string): Promise<string> {
+function sanitizeAndResolvePath(rawPath: string): string {
     if (!rawPath || rawPath.includes('\0')) {
         throw new BadRequestError('Path is empty or contains illegal null byte character');
     }
@@ -59,7 +50,20 @@ export async function authorizeInputPath(rawPath: string): Promise<string> {
         throw new BadRequestError(`Path references reserved device name: "${baseName}"`);
     }
 
-    const resolved = path.resolve(normalized);
+    return path.resolve(normalized);
+}
+
+/**
+ * Validates, canonicalizes, and authorizes an input audio file path.
+ *
+ * @param rawPath - Client-supplied file path string.
+ * @returns Canonical, realpath-resolved absolute path.
+ * @throws BadRequestError on null bytes, reserved names, or non-file paths.
+ * @throws NotFoundError if the file does not exist on disk.
+ * @throws ForbiddenError if the file lies outside ALLOWED_MEDIA_ROOTS.
+ */
+export async function authorizeInputPath(rawPath: string): Promise<string> {
+    const resolved = sanitizeAndResolvePath(rawPath);
 
     let realPath: string;
     try {
@@ -93,17 +97,7 @@ export async function authorizeInputPath(rawPath: string): Promise<string> {
  * @throws ForbiddenError if the destination lies outside ALLOWED_MEDIA_ROOTS.
  */
 export async function authorizeOutputPath(rawPath: string): Promise<string> {
-    if (!rawPath || rawPath.includes('\0')) {
-        throw new BadRequestError('Path is empty or contains illegal null byte character');
-    }
-
-    const normalized = path.normalize(rawPath);
-    const baseName = path.basename(normalized);
-    if (WINDOWS_RESERVED_DEVICE_NAMES.test(baseName)) {
-        throw new BadRequestError(`Path references reserved device name: "${baseName}"`);
-    }
-
-    const resolved = path.resolve(normalized);
+    const resolved = sanitizeAndResolvePath(rawPath);
 
     // If output destination already exists on disk, check for symlink hijacking
     try {

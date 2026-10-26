@@ -7,7 +7,7 @@ import { serverEnv } from '@/config/env.server';
 import { parseBitrateMode } from '@/lib/media';
 import { parseOptionalNumber } from '@/lib/number';
 
-import { type ToolHealth, inspectNativeTool, resolveActiveEngine, toolHealthStatus } from '../tool-inspector';
+import { type ToolHealth, evaluateToolHealth } from '../tool-inspector';
 import type { MediaInfoQC } from '../types';
 
 const execFileAsync = promisify(execFile);
@@ -32,20 +32,7 @@ export class MediaInfoAdapter {
      * Returns health diagnostics for this adapter.
      */
     public static async getToolHealth(): Promise<ToolHealth> {
-        const native = await inspectNativeTool('mediaInfo', serverEnv.MEDIAINFO_PATH, ['--version'], parseMediaInfoVersion);
-
-        const configured = serverEnv.PROBING_ENGINE;
-        const active = resolveActiveEngine(configured, native.available, true);
-
-        return {
-            configured,
-            active,
-            implementations: {
-                native,
-                wasm: { available: true },
-            },
-            status: toolHealthStatus(configured, active, native.available, true),
-        };
+        return evaluateToolHealth('mediaInfo', serverEnv.MEDIAINFO_PATH, ['--version'], parseMediaInfoVersion, serverEnv.PROBING_ENGINE);
     }
 
     /**

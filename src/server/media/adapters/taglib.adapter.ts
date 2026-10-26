@@ -8,7 +8,7 @@ import { applyCoverArt, applyTags, clearPictures, readMetadata, readPictures } f
 
 import { serverEnv } from '@/config/env.server';
 
-import { type ToolHealth, inspectNativeTool, resolveActiveEngine, toolHealthStatus } from '../tool-inspector';
+import { type ToolHealth, evaluateToolHealth } from '../tool-inspector';
 import type { RawPictureData, TagWriteOptions, TagWriteResult } from '../types';
 import { TagMapper } from './tag-mapper';
 import type { AudioTags, WriteAudioTags } from '@/lib/media';
@@ -91,20 +91,7 @@ export class TagLibAdapter {
      */
     public static async getToolHealth(): Promise<ToolHealth> {
         const workerPath = resolveWorkerPath(serverEnv.TAGLIB_WORKER_PATH);
-        const native = await inspectNativeTool('taglib', workerPath, ['--version'], parseTagLibVersion);
-
-        const configured = serverEnv.METADATA_ENGINE;
-        const active = resolveActiveEngine(configured, native.available, true);
-
-        return {
-            configured,
-            active,
-            implementations: {
-                native,
-                wasm: { available: true },
-            },
-            status: toolHealthStatus(configured, active, native.available, true),
-        };
+        return evaluateToolHealth('taglib', workerPath, ['--version'], parseTagLibVersion, serverEnv.METADATA_ENGINE);
     }
 
     /**
@@ -224,21 +211,10 @@ export class TagLibAdapter {
      * // }
      */
     public async writeTags(canonicalPath: string, tags: WriteAudioTags, options: TagWriteOptions = {}): Promise<TagWriteResult> {
-        let backupPath: string | undefined;
-
-        if (options.preserveOriginal) {
-            backupPath = `${canonicalPath}_original`;
-            try {
-                await fs.promises.link(canonicalPath, backupPath);
-            } catch {
-                await fs.promises.copyFile(canonicalPath, backupPath);
-            }
-        }
+        const backupPath = await this.createBackupIfNeeded(canonicalPath, options.preserveOriginal);
 
         const fileBuffer = await fs.promises.readFile(canonicalPath);
         const plan = TagMapper.toTagLibProperties(tags);
-        console.log('🪵 > taglib.adapter.ts:195 > TagLibAdapter > writeTags > tags:', tags)
-        console.log('🪵 > taglib.adapter.ts:195 > TagLibAdapter > writeTags > plan:', plan)
 
         // TagLib client write boundary:
         // - Empty string list values ([]): translated to property removal / erase
@@ -258,16 +234,7 @@ export class TagLibAdapter {
         mimeType = 'image/jpeg',
         options: TagWriteOptions = {}
     ): Promise<TagWriteResult> {
-        let backupPath: string | undefined;
-
-        if (options.preserveOriginal) {
-            backupPath = `${canonicalPath}_original`;
-            try {
-                await fs.promises.link(canonicalPath, backupPath);
-            } catch {
-                await fs.promises.copyFile(canonicalPath, backupPath);
-            }
-        }
+        const backupPath = await this.createBackupIfNeeded(canonicalPath, options.preserveOriginal);
 
         const fileBuffer = await fs.promises.readFile(canonicalPath);
         const updatedBuffer = await applyCoverArt(fileBuffer, imageBuffer, mimeType);
@@ -280,22 +247,28 @@ export class TagLibAdapter {
      * Clears all embedded cover art from an audio file.
      */
     public async removeArtwork(canonicalPath: string, options: TagWriteOptions = {}): Promise<TagWriteResult> {
-        let backupPath: string | undefined;
-
-        if (options.preserveOriginal) {
-            backupPath = `${canonicalPath}_original`;
-            try {
-                await fs.promises.link(canonicalPath, backupPath);
-            } catch {
-                await fs.promises.copyFile(canonicalPath, backupPath);
-            }
-        }
+        const backupPath = await this.createBackupIfNeeded(canonicalPath, options.preserveOriginal);
 
         const fileBuffer = await fs.promises.readFile(canonicalPath);
         const updatedBuffer = await clearPictures(fileBuffer);
         await this.atomicWriteFile(canonicalPath, Buffer.from(updatedBuffer));
 
         return { filePath: canonicalPath, backupPath };
+    }
+
+    /**
+     * Creates a hardlink or copy backup (<file>_original) when preserveOriginal is true.
+     */
+    private async createBackupIfNeeded(canonicalPath: string, preserveOriginal?: boolean): Promise<string | undefined> {
+        if (!preserveOriginal) return undefined;
+
+        const backupPath = `${canonicalPath}_original`;
+        try {
+            await fs.promises.link(canonicalPath, backupPath);
+        } catch {
+            await fs.promises.copyFile(canonicalPath, backupPath);
+        }
+        return backupPath;
     }
 
     /**

@@ -7,7 +7,7 @@ import { serverEnv } from '@/config/env.server';
 import { isLosslessAudio } from '@/lib/media';
 import { parseNumber } from '@/lib/number';
 
-import { type ToolHealth, inspectNativeTool, resolveActiveEngine, toolHealthStatus } from '../tool-inspector';
+import { type ToolHealth, evaluateToolHealth } from '../tool-inspector';
 import type { TechnicalAudioInfo } from '../types';
 
 const execFileAsync = promisify(execFile);
@@ -60,20 +60,7 @@ export class FFprobeAdapter {
      * Returns health diagnostics for this adapter.
      */
     public static async getToolHealth(): Promise<ToolHealth> {
-        const native = await inspectNativeTool('ffprobe', serverEnv.FFPROBE_PATH, ['-version'], parseFFprobeVersion);
-
-        const configured = serverEnv.PROBING_ENGINE;
-        const active = resolveActiveEngine(configured, native.available, true);
-
-        return {
-            configured,
-            active,
-            implementations: {
-                native,
-                wasm: { available: true },
-            },
-            status: toolHealthStatus(configured, active, native.available, true),
-        };
+        return evaluateToolHealth('ffprobe', serverEnv.FFPROBE_PATH, ['-version'], parseFFprobeVersion, serverEnv.PROBING_ENGINE);
     }
 
     /**

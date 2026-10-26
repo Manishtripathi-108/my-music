@@ -1,4 +1,4 @@
-import { convertDate } from '@/lib/format';
+import { convertDate, splitDelimitedList } from '@/lib/format';
 import { compactKey, getFieldKeys, isKnownTagLibProperty, parseFieldValue, TAG_FIELDS } from '@/lib/media/tag-registry';
 import { type AudioTags, audioTagsSchema, customTagNameSchema, writeAudioTagsSchema } from '@/lib/media/tags.schema';
 
@@ -157,14 +157,7 @@ function autoTypeValue(values: string[]): string | number | boolean | string[] {
         const val = values[0].trim();
 
         if (val.includes(',')) {
-            const parts = [
-                ...new Set(
-                    val
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                ),
-            ];
+            const parts = splitDelimitedList(val);
             if (parts.length > 1) return parts;
         }
 
@@ -178,14 +171,7 @@ function autoTypeValue(values: string[]): string | number | boolean | string[] {
         return val;
     }
 
-    return [
-        ...new Set(
-            values
-                .flatMap((v) => (v.includes(',') ? v.split(',') : [v]))
-                .map((s) => s.trim())
-                .filter(Boolean)
-        ),
-    ];
+    return splitDelimitedList(values);
 }
 
 /** Reads unrecognized properties as custom tags, skipping known and synthetic keys. */
@@ -245,25 +231,8 @@ function toTagLibProperties(input: unknown): Record<string, string[]> {
             continue;
         }
 
-        if (spec.kind === 'list' && Array.isArray(value)) {
-            result[spec.property] = [
-                ...new Set(
-                    value
-                        .flatMap((item) => (item.includes(',') ? item.split(',') : [item]))
-                        .map((item) => item.trim())
-                        .filter(Boolean)
-                ),
-            ];
-        } else {
-            result[spec.property] = [
-                ...new Set(
-                    [String(value)]
-                        .flatMap((item) => (item.includes(',') ? item.split(',') : [item]))
-                        .map((item) => item.trim())
-                        .filter(Boolean)
-                ),
-            ];
-        }
+        const rawItems = spec.kind === 'list' && Array.isArray(value) ? value.map(String) : String(value);
+        result[spec.property] = splitDelimitedList(rawItems);
     }
 
     const uniqueCustomTagKeys = new Set<string>();

@@ -478,3 +478,42 @@ export function convertDate(value: string | Date | number): DateParts | null {
 
     return null;
 }
+
+/* ------------------------ String & List Parsing --------------------------- */
+
+/**
+ * Splits string(s) by a delimiter, trimming whitespace, filtering empty values,
+ * and returning a deduplicated array of non-empty strings.
+ *
+ * @param input - A single string, an array of strings, or undefined/null.
+ * @param delimiter - Delimiter string or RegExp (defaults to ',').
+ * @returns Deduplicated array of non-empty, trimmed strings.
+ *
+ * @example
+ * splitDelimitedList('Rock, Pop, Jazz'); // ['Rock', 'Pop', 'Jazz']
+ * splitDelimitedList(['Rock, Pop', 'Jazz, Rock']); // ['Rock', 'Pop', 'Jazz']
+ * splitDelimitedList('path1;path2', /[;,]/); // ['path1', 'path2']
+ */
+export function splitDelimitedList(
+    input: string | readonly string[] | null | undefined,
+    delimiter: string | RegExp = ','
+): string[] {
+    if (!input) return [];
+
+    const items = Array.isArray(input) ? input : [input];
+    const result = new Set<string>();
+
+    for (const item of items) {
+        if (typeof item !== 'string') continue;
+        const parts = item.split(delimiter);
+        for (const part of parts) {
+            const trimmed = part.trim();
+            if (trimmed.length > 0) {
+                result.add(trimmed);
+            }
+        }
+    }
+
+    return Array.from(result);
+}
+

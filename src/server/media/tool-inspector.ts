@@ -142,3 +142,28 @@ export function mergeHealthStatus(statuses: readonly HealthStatus[]): HealthStat
     if (statuses.includes('degraded')) return 'degraded';
     return 'healthy';
 }
+
+/**
+ * Evaluates unified health diagnostics for a dual native/WASM tool.
+ */
+export async function evaluateToolHealth(
+    cacheKey: string,
+    executablePath: string | null | undefined,
+    args: string[],
+    parseVersion: VersionParser,
+    configured: Engine
+): Promise<ToolHealth> {
+    const native = await inspectNativeTool(cacheKey, executablePath, args, parseVersion);
+    const active = resolveActiveEngine(configured, native.available, true);
+
+    return {
+        configured,
+        active,
+        implementations: {
+            native,
+            wasm: { available: true },
+        },
+        status: toolHealthStatus(configured, active, native.available, true),
+    };
+}
+

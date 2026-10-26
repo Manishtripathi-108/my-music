@@ -1,9 +1,6 @@
 import { z } from 'zod';
 
-/**
- * Normalizes a property key for case-insensitive, punctuation-insensitive comparison.
- */
-export const compactKey = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]/g, '');
+import { splitDelimitedList } from '../format';
 import {
     booleanSchema,
     dateSchema,
@@ -14,6 +11,11 @@ import {
     positiveNumberSchema,
     textSchema,
 } from '../schema';
+
+/**
+ * Normalizes a property key for case-insensitive, punctuation-insensitive comparison.
+ */
+export const compactKey = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /* -------------------------- Value Kinds & Parsing ------------------------- */
 
@@ -68,14 +70,7 @@ export function parseFieldValue(kind: ValueKind, value: string[]): unknown | und
         }
 
         case 'list':
-            return [
-                ...new Set(
-                    value
-                        .flatMap((item) => (item.includes(',') ? item.split(',') : [item]))
-                        .map((item) => item.trim())
-                        .filter(Boolean)
-                ),
-            ];
+            return splitDelimitedList(value);
 
         default: {
             const exhaustive: never = kind;

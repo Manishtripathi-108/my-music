@@ -191,15 +191,7 @@ export class MetadataCoordinator {
                 const stats = await fs.promises.stat(cachedPath);
                 if (stats.size > 0) {
                     const buffer = await fs.promises.readFile(cachedPath);
-                    const { width, height, mimeType } = await getImageMetadata(buffer);
-                    return {
-                        cachedPath,
-                        filename: path.basename(query.file),
-                        mimeType,
-                        sizeBytes: stats.size,
-                        width,
-                        height,
-                    };
+                    return await this.buildExtractedArtwork(cachedPath, buffer);
                 }
             } catch {
                 return null;
@@ -247,15 +239,7 @@ export class MetadataCoordinator {
                     const cStats = await fs.promises.stat(/*turbopackIgnore: true*/ candidate);
                     if (cStats.size > 100) {
                         const buffer = await fs.promises.readFile(/*turbopackIgnore: true*/ candidate);
-                        const { width, height, mimeType } = await getImageMetadata(buffer);
-                        return {
-                            cachedPath: candidate,
-                            filename: path.basename(candidate),
-                            mimeType,
-                            sizeBytes: cStats.size,
-                            width,
-                            height,
-                        };
+                        return await this.buildExtractedArtwork(candidate, buffer);
                     }
                 } catch {
                     // Try next candidate
@@ -273,17 +257,25 @@ export class MetadataCoordinator {
             return null;
         }
 
-        const { width, height, mimeType } = await getImageMetadata(artworkData.data);
+        const { mimeType } = await getImageMetadata(artworkData.data);
         const ext = mimeType === 'image/png' ? 'png' : 'jpg';
         const destination = path.join(/*turbopackIgnore: true*/ this.cacheDir, `${cacheKey}.${ext}`);
 
         await fs.promises.writeFile(/*turbopackIgnore: true*/ destination, artworkData.data);
 
+        return this.buildExtractedArtwork(destination, artworkData.data);
+    }
+
+    /**
+     * Constructs a normalized ExtractedArtwork descriptor from a cached image buffer.
+     */
+    private async buildExtractedArtwork(cachedPath: string, buffer: Buffer): Promise<ExtractedArtwork> {
+        const { width, height, mimeType } = await getImageMetadata(buffer);
         return {
-            cachedPath: destination,
-            filename: `${cacheKey}.${ext}`,
+            cachedPath,
+            filename: path.basename(cachedPath),
             mimeType,
-            sizeBytes: artworkData.data.length,
+            sizeBytes: buffer.length,
             width,
             height,
         };

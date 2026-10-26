@@ -37,6 +37,8 @@ assert {
   res.status: eq 200
   res.body.success: eq true
   res.body.data.total: eq 1
+  res.body.data.succeeded: isDefined
+  res.body.data.succeeded[0].tags: isDefined
 }
 
 tests {
@@ -44,5 +46,6 @@ tests {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().success).to.be.true;
     expect(res.getBody().data.succeeded).to.be.an('array');
+    expect(res.getBody().data.succeeded[0].tags).to.be.an('object');
   });
 }

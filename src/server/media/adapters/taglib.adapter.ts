@@ -222,7 +222,8 @@ export class TagLibAdapter {
         const updatedBuffer = await applyTags(fileBuffer, plan);
         await this.atomicWriteFile(canonicalPath, Buffer.from(updatedBuffer));
 
-        return { filePath: canonicalPath, backupPath };
+        const { tags: updatedTags } = await this.readTags(canonicalPath);
+        return { filePath: canonicalPath, backupPath, tags: updatedTags };
     }
 
     /**
@@ -240,7 +241,8 @@ export class TagLibAdapter {
         const updatedBuffer = await applyCoverArt(fileBuffer, imageBuffer, mimeType);
         await this.atomicWriteFile(canonicalPath, Buffer.from(updatedBuffer));
 
-        return { filePath: canonicalPath, backupPath };
+        const { tags: updatedTags } = await this.readTags(canonicalPath);
+        return { filePath: canonicalPath, backupPath, tags: updatedTags };
     }
 
     /**
@@ -253,7 +255,8 @@ export class TagLibAdapter {
         const updatedBuffer = await clearPictures(fileBuffer);
         await this.atomicWriteFile(canonicalPath, Buffer.from(updatedBuffer));
 
-        return { filePath: canonicalPath, backupPath };
+        const { tags: updatedTags } = await this.readTags(canonicalPath);
+        return { filePath: canonicalPath, backupPath, tags: updatedTags };
     }
 
     /**

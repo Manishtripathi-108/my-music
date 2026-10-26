@@ -93,6 +93,7 @@ export interface TagWriteOptions {
 export interface TagWriteResult {
     filePath: string;
     backupPath?: string;
+    tags: AudioTags;
 }
 
 export interface BatchTagWriteFailure {

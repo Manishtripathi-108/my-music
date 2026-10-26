@@ -34,6 +34,7 @@ assert {
   res.body.success: eq true
   res.body.data.filePath: isDefined
   res.body.data.backupPath: isDefined
+  res.body.data.tags: isDefined
 }
 
 tests {
@@ -42,5 +43,6 @@ tests {
     expect(res.getBody().success).to.be.true;
     expect(res.getBody().data.filePath).to.be.a('string');
     expect(res.getBody().data.backupPath).to.be.a('string');
+    expect(res.getBody().data.tags).to.be.an('object');
   });
 }

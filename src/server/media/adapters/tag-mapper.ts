@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { convertDate, splitDelimitedList } from '@/lib/format';
 import { compactKey, getFieldKeys, isKnownTagLibProperty, parseFieldValue, TAG_FIELDS } from '@/lib/media/tag-registry';
 import { type AudioTags, audioTagsSchema, customTagNameSchema, writeAudioTagsSchema } from '@/lib/media/tags.schema';

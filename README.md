@@ -1,16 +1,510 @@
 # My Music
 
-A modern, high-performance web audio library and music metadata manager built with Next.js 16 (App Router), TypeScript, Ark UI, Tailwind CSS v4, ExifTool, FFmpeg, and FFprobe.
+A modern, high-performance web audio library and music metadata manager built with Next.js 16 (App Router), TypeScript, TagLib 2.x, FFprobe, MediaInfo, FFmpeg, Ark UI, and Tailwind CSS v4.
 
 ---
 
-## Architecture & System Overview
+## Source Directory Structure & Layer Responsibilities
 
-- **Persistent ExifTool Subsystem**: Executes a persistent ExifTool process using `-stay_open True -@ -` to eliminate Perl startup overhead, cutting command latency from ~250ms to ~15ms with full queue serialization, process crash recovery, and batch processing.
-- **FFprobe Audio Engine**: Extracts deep audio technical specifications (codec, container, exact duration, sample rate, channels, bit rate, bits per sample, and mathematical lossless detection).
-- **Artwork Extraction & Stream Cache**: Uses FFmpeg direct stream extraction with automatic fallback to ExifTool binary tags, deterministically caching album covers under `cache/art` and serving them via HTTP binary streaming with aggressive caching headers.
-- **Strict Server/Client Boundary**: Server infrastructure is strictly guarded with `server-only`. Environment configuration is validated at startup via Zod in `src/config/env.server.ts`.
-- **Unified API Standard**: All API endpoints return a typed `ApiResponse<T>` envelope with standardized HTTP status codes and machine-readable error codes.
+The codebase follows a strict separation of concerns under `src/`, enforcing clear boundaries between client and server code, business domains, shared UI, and technical infrastructure:
+
+```
+src/
+├── app/                      # ROUTING & COMPOSITION ONLY
+│   ├── (routes)/             # Page routes, layouts, templates, loading, error boundaries
+│   ├── api/                  # Thin Route Handlers (HTTP method dispatch, schema parsing)
+│   ├── layout.tsx            # Root application layout
+│   └── globals.css           # Global Tailwind CSS styles and theme tokens
+│
+├── features/                 # BUSINESS DOMAINS (One directory per domain)
+│   ├── media/                # Audio metadata, tagging, transcoding, and artwork domain
+│   │   ├── schemas/          # Route input validation schemas (isomorphic Zod)
+│   │   ├── index.ts          # Client-safe public API (schemas, types, constants)
+│   │   └── server.ts         # Server-only public API ("server-only" entry points)
+│   └── scanner/              # Audio library scanning and discovery domain
+│       ├── components/       # UI components owned by the scanner (ScanModal, Dashboard)
+│       ├── hooks/            # Client state hooks (useScanModalStore)
+│       ├── schemas/          # Validation schemas (scanRequestSchema)
+│       └── index.ts          # Client-safe feature public API
+│
+├── components/               # SHARED UI WITH NO BUSINESS KNOWLEDGE
+│   ├── ui/                   # Generic primitives (Button, Input, Slider, Modal)
+│   ├── common/               # App-wide compounds (PageHeader, EmptyState, ConfirmDialog)
+│   ├── layout/               # Shell layout elements (Header, Sidebar, Navigation)
+│   └── providers/            # Context providers (Theme, QueryClient, Toast)
+│
+├── hooks/                    # SHARED CLIENT HOOKS (Generic, domain-agnostic)
+│
+├── lib/                      # GENERIC ISOMORPHIC UTILITIES & PRIMITIVES
+│   ├── cn.ts                 # Classname merge utility (clsx + tailwind-merge)
+│   ├── format.ts             # String formatting, time/duration display, date parsers
+│   ├── number.ts             # Numeric clamps, rounding, and byte calculations
+│   ├── schema/               # Generic primitive Zod schemas (text, number, boolean)
+│   └── media/                # Shared isomorphic media contracts:
+│       ├── formats.ts        # Audio extensions, codecs, MIME mapping, lossless checks
+│       ├── path.schema.ts    # Reusable file and directory path validation schemas
+│       ├── tag-registry.ts   # Audio tag specification, field dictionary, property maps
+│       └── tags.schema.ts    # AudioTags and WriteAudioTags schemas
+│
+├── server/                   # SHARED SERVER INFRASTRUCTURE (server-only)
+│   ├── api/                  # Standardized response helpers (apiSuccess, handleRouteError)
+│   └── media/                # Media subsystem execution engines:
+│       ├── adapters/         # Low-level binary & binding adapters (TagLib, FFprobe, MediaInfo)
+│       ├── media-converter.ts# Transcoding engine with SoX DSP resampling and dithering
+│       ├── media-diagnostics.ts # Deep binary inspection & health diagnostics
+│       ├── metadata-coordinator.ts # High-level TagLib/FFprobe/MediaInfo orchestrator
+│       ├── path-security.ts  # Directory confinement & symlink traversal protection
+│       ├── tool-inspector.ts # Binary version and LGPL license validator
+│       └── types.ts          # Server-only technical types and data models
+│
+├── config/                   # APPLICATION CONFIGURATION
+│   ├── env.server.ts         # Validated server-only environment variables (serverEnv)
+│   └── routes.ts             # Application route constants
+│
+└── types/                    # CROSS-CUTTING, DOMAIN-INDEPENDENT TYPES
+    └── api.ts                # Standardized ApiResponse<T> envelope and error models
+```
+
+### Layer Boundary & Dependency Matrix
+
+| Layer                | Runtime Boundary                                              | May Import                                                                                                  | Must Not Import                                           |
+| :------------------- | :------------------------------------------------------------ | :---------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------- |
+| **`src/app`**        | Server & Client (Pages / Leaf Components)                     | `features` (public API), `components`, `hooks`, `lib`, `server`, `config`, `types`                          | _(Root level)_                                            |
+| **`src/features`**   | Isolated Domain (Client-Safe `index.ts` / Server `server.ts`) | Own internals, other `features` (via public API), `components`, `hooks`, `lib`, `server`, `config`, `types` | `app`                                                     |
+| **`src/components`** | Client & Server (Leaf UI)                                     | `hooks`, `lib`, `config` (client-safe), `types`                                                             | `app`, `features`, `server`                               |
+| **`src/hooks`**      | Client-Only                                                   | `lib`, `config` (client-safe), `types`                                                                      | `app`, `features`, `components`, `server`                 |
+| **`src/server`**     | Server-Only (`import 'server-only'`)                          | `lib`, `config`, `types`                                                                                    | `app`, `features`, `components`, `hooks`                  |
+| **`src/lib`**        | Isomorphic (Client & Server Safe)                             | `config` (client-safe), `types`                                                                             | `app`, `features`, `components`, `hooks`, `server`        |
+| **`src/config`**     | Config Boundary (`env.server` vs `env.client`)                | `types`                                                                                                     | `app`, `features`, `components`, `hooks`, `server`, `lib` |
+| **`src/types`**      | Pure Type Declarations (Zero JS output)                       | _(Nothing)_                                                                                                 | All application layers                                    |
+
+---
+
+## Media Subsystem Architecture & Decoupled Engines
+
+The media subsystem operates on three decoupled engines backed by native binaries with automatic WebAssembly/subprocess fallbacks:
+
+```mermaid
+flowchart TD
+    subgraph ClientLayer["Client & Consumer Layer"]
+        UI["Web UI / Ark UI Components"]
+        API_Client["Bruno / External HTTP Clients"]
+    end
+
+    subgraph RouteLayer["Presentation & Routing (src/app/api/media)"]
+        R_Health["/api/health & /api/health/media\n(GET)"]
+        R_Meta["/api/media/metadata\n(GET / POST batch)"]
+        R_Tech["/api/media/technical\n(GET)"]
+        R_Tags["/api/media/tags\n(GET / PATCH / POST batch)"]
+        R_Convert["/api/media/convert\n(POST)"]
+        R_Art["/api/media/artwork\n(GET stream / POST)"]
+        R_Scan["/api/scan\n(POST)"]
+    end
+
+    subgraph FeatureLayer["Business Domain Boundary (src/features/media)"]
+        ZodSchemas["Route Schemas & Public API\n- tags.schema, metadata.schema\n- conversion.schema, artwork.schema\n- index.ts (client-safe) & server.ts (server-only)"]
+    end
+
+    subgraph ServerLayer["Shared Server Infrastructure (src/server/media) - server-only"]
+        Coordinator["MetadataCoordinator\n- TagLib + FFprobe + MediaInfo orchestration\n- Non-destructive artwork extraction & disk caching"]
+        Converter["MediaConverter (FFmpeg LGPL)\n- SoX 28-bit resampler & dither\n- ITU-R BS.775 stereo downmix\n- Atomic rename transcode"]
+        Adapters["Engine Adapters\n- TagLibAdapter (node-taglib2 native & worker sidecar)\n- FFprobeAdapter (elementary stream prober)\n- MediaInfoAdapter (QC inspection)\n- TagMapper (ID3/Vorbis/MP4 property mapping)"]
+        Security["Path Security\n- ALLOWED_MEDIA_ROOTS confinement\n- Symlink realpath resolution & traversal protection"]
+    end
+
+    subgraph LibLayer["Shared Isomorphic Primitives (src/lib/media)"]
+        LibPrimitives["Isomorphic Primitives & Specs\n- formats.ts (codecs, MIME types, isLosslessAudio)\n- path.schema.ts (filePathSchema)\n- tag-registry.ts (TAG_FIELDS, property mappings)\n- tags.schema.ts (audioTagsSchema, writeAudioTagsSchema)"]
+    end
+
+    subgraph ExternalLayer["OS & Native Binaries"]
+        TagLibBin["TagLib 2.x (node-taglib2 / sidecar worker)"]
+        FFprobeBin["FFprobe CLI"]
+        MediaInfoBin["MediaInfo CLI"]
+        FFmpegBin["FFmpeg CLI (LGPL)"]
+        DiskCache["Disk Cache (cache/art/*.jpg|png|webp)"]
+        AudioFiles["Audio Filesystem (FLAC, MP3, ALAC, Opus, AAC, WAV, OGG)"]
+    end
+
+    UI --> RouteLayer
+    API_Client --> RouteLayer
+
+    RouteLayer --> FeatureLayer
+    FeatureLayer --> ServerLayer
+    FeatureLayer --> LibLayer
+    ServerLayer --> LibLayer
+
+    ServerLayer --> ExternalLayer
+```
+
+---
+
+### Detailed Component Roles & Responsibilities
+
+| Component                 | Location                                         | Primary Responsibilities & Design Patterns                                                                                                                                                                                                          |
+| :------------------------ | :----------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`MetadataCoordinator`** | `src/server/media/metadata-coordinator.ts`       | **Multi-Engine Orchestrator**: Executes TagLib, FFprobe, and MediaInfo concurrently via `Promise.all`. Normalizes tags into unified `AudioTags`. Manages disk artwork caching (`cache/art`), in-flight deduplication, and zero-remuxing extraction. |
+| **`TagLibAdapter`**       | `src/server/media/adapters/taglib.adapter.ts`    | **Native Metadata Engine**: Primary interface using `NodeTagLib2Adapter` (native C++ N-API bindings via `voltraco/node-taglib2`), with automatic fallback to standalone `taglib-worker` executable. Guarantees bit-for-bit lossless tag writes.     |
+| **`TagMapper`**           | `src/server/media/adapters/tag-mapper.ts`        | **Property Transformation Engine**: Maps heterogeneous raw TagLib property dictionaries (ID3v2.3, ID3v2.4, Vorbis Comments, MP4 atoms, APEv2) to/from strongly-typed `AudioTags` and handles custom tag definitions.                                |
+| **`FFprobeAdapter`**      | `src/server/media/adapters/ffprobe.adapter.ts`   | **Stream Specification Engine**: Spawns `ffprobe` with JSON output formatting to inspect container and codec details. Evaluates streams against a mathematical lossless matrix with bounded concurrency (`MAX_CONCURRENCY = 8`).                    |
+| **`MediaInfoAdapter`**    | `src/server/media/adapters/mediainfo.adapter.ts` | **QC Quality Inspector**: Supplements FFprobe with deep analysis: exact CBR/VBR bitrate mode, bit depth, encoder library strings, and gapless audio playback parameters.                                                                            |
+| **`MediaConverter`**      | `src/server/media/media-converter.ts`            | **Audiophile Transcoding Engine**: Spawns LGPL-compliant FFmpeg with SoX 28-bit precision resampling, triangular/lipshitz dithering, ITU-R BS.775 stereo downmixing, progress tracking via pipe, and atomic rename writes.                          |
+| **`PathSecurity`**        | `src/server/media/path-security.ts`              | **Filesystem Security Guard**: Validates all incoming and outgoing file paths against `ALLOWED_MEDIA_ROOTS`. Resolves symlinks using `fs.realpath` and prevents path traversal attacks.                                                             |
+| **`ToolInspector`**       | `src/server/media/tool-inspector.ts`             | **Runtime Health & Compliance**: Inspects installed binaries, verifies versions, checks LGPL licensing flags (`--enable-gpl` / `--enable-nonfree` exclusion), and tests engine capabilities.                                                        |
+
+---
+
+## Audio Tag Registry & Field Specification
+
+The application enforces a single source of truth for audio metadata fields defined in `src/lib/media/tag-registry.ts`. TagLib's property map automatically translates these canonical fields across underlying container formats:
+
+| Domain Field          | Canonical Property      | Recognized Aliases             | Value Kind          | Validation / Type                                                |
+| :-------------------- | :---------------------- | :----------------------------- | :------------------ | :--------------------------------------------------------------- |
+| `title`               | `TITLE`                 | _(None)_                       | `text`              | Cleaned non-empty string                                         |
+| `artists`             | `ARTIST`                | `ARTISTS`, `ARTISTNAME`        | `list`              | String array (split on `[,;/]`)                                  |
+| `album`               | `ALBUM`                 | _(None)_                       | `text`              | String                                                           |
+| `albumArtists`        | `ALBUMARTIST`           | `ALBUM ARTIST`, `ALBUMARTISTS` | `list`              | String array                                                     |
+| `composers`           | `COMPOSER`              | _(None)_                       | `list`              | String array                                                     |
+| `genres`              | `GENRE`                 | `GENRES`                       | `list`              | Normalized string array                                          |
+| `year`                | `YEAR`                  | _(Special Date Parsing)_       | `positiveInteger`   | 4-digit safe integer (e.g. `2024`)                               |
+| `date`                | `DATE`                  | _(Special Date Parsing)_       | `text`              | ISO-8601 string (`YYYY-MM-DD`)                                   |
+| `trackNumber`         | `TRACKNUMBER`           | `TRACK`                        | `positiveInteger`   | 1-indexed track position                                         |
+| `trackTotal`          | `TRACKTOTAL`            | `TOTALTRACKS`, `TRACKCOUNT`    | `positiveInteger`   | Total tracks on disc                                             |
+| `discNumber`          | `DISCNUMBER`            | `DISKNUMBER`, `DISC`, `DISK`   | `positiveInteger`   | 1-indexed disc position                                          |
+| `discTotal`           | `DISCTOTAL`             | `TOTALDISCS`, `DISCCOUNT`      | `positiveInteger`   | Total discs in album                                             |
+| `bpm`                 | `BPM`                   | `TEMPO`                        | `positiveNumber`    | Beats per minute (e.g. `128.5`)                                  |
+| `isrc`                | `ISRC`                  | _(None)_                       | `text`              | Strict 12-char ISRC regex (`/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/`)       |
+| `upc`                 | `UPC`                   | `UPCA`, `UPCE`, `GTIN`         | `text`              | 8, 12, 13, or 14-digit numeric string                            |
+| `barcode`             | `BARCODE`               | _(None)_                       | `text`              | Barcode identifier string                                        |
+| `catalogNumber`       | `CATALOGNUMBER`         | `CATALOG NUMBER`, `CATALOGNO`  | `text`              | Catalog number                                                   |
+| `label`               | `LABEL`                 | `PUBLISHER`, `RECORDLABEL`     | `text`              | Record label / publisher                                         |
+| `lyrics`              | `LYRICS`                | `UNSYNCEDLYRICS`               | `freeText`          | Multiline lyrics content                                         |
+| `comment`             | `COMMENT`               | `DESCRIPTION`                  | `freeText`          | Arbitrary user notes                                             |
+| `copyright`           | `COPYRIGHT`             | _(None)_                       | `freeText`          | Copyright notice                                                 |
+| `compilation`         | `COMPILATION`           | _(None)_                       | `text`              | Boolean indicator (`true`/`false`)                               |
+| `rating`              | `RATING`                | _(None)_                       | `nonNegativeNumber` | Popularimeter / user rating                                      |
+| `replayGainTrackGain` | `REPLAYGAIN_TRACK_GAIN` | _(None)_                       | `gain`              | Decibel gain (parsed from `"-6.2 dB"`)                           |
+| `replayGainTrackPeak` | `REPLAYGAIN_TRACK_PEAK` | _(None)_                       | `nonNegativeNumber` | Track peak amplitude ratio                                       |
+| `replayGainAlbumGain` | `REPLAYGAIN_ALBUM_GAIN` | _(None)_                       | `gain`              | Album decibel gain                                               |
+| `replayGainAlbumPeak` | `REPLAYGAIN_ALBUM_PEAK` | _(None)_                       | `nonNegativeNumber` | Album peak amplitude ratio                                       |
+| `customTags`          | _(Dynamic Key)_         | _(Arbitrary ASCII)_            | `record`            | User key-value pairs (`boolean \| number \| string \| string[]`) |
+
+### Custom Tag Sanitization Rules
+
+- **Name Constraints**: Custom keys must start with a letter (`[A-Za-z]`), contain only printable ASCII characters, and cannot contain the `=` sign.
+- **Reserved Words**: Keys matching JavaScript prototypes (`constructor`, `prototype`, `__proto__`) are strictly rejected.
+- **TagLib Properties Exclusion**: Standard known properties cannot be set via `customTags` to avoid property duplication.
+
+---
+
+## Audio Format & Codec Capabilities Matrix
+
+The media engine provides broad format support derived from the intersection of TagLib 2.x, FFprobe, and FFmpeg:
+
+| Extension        | Container Format | Native Tag Standard                | Inspection & Probing |     Lossless Codec?      | Transcode Target? |
+| :--------------- | :--------------- | :--------------------------------- | :------------------: | :----------------------: | :---------------: |
+| `.flac`          | FLAC             | Vorbis Comments + Picture Blocks   |      Supported       |       Yes (`flac`)       |     Supported     |
+| `.m4a` / `.mp4`  | MPEG-4 Part 14   | MP4 Atoms (`covr`, `©nam`, `trkn`) |      Supported       |    Optional (`alac`)     |     Supported     |
+| `.mp3`           | MPEG Audio       | ID3v2.4 / ID3v2.3 (`APIC`, `TIT2`) |      Supported       |        No (`mp3`)        |     Supported     |
+| `.opus`          | Ogg / Opus       | Vorbis Comments                    |      Supported       |       No (`opus`)        |     Supported     |
+| `.ogg`           | Ogg Vorbis       | Vorbis Comments                    |      Supported       |      No (`vorbis`)       |     Supported     |
+| `.wav`           | RIFF WAVE        | RIFF INFO / ID3 Chunk              |      Supported       | Yes (`pcm_s*`, `pcm_f*`) |     Supported     |
+| `.aiff` / `.aif` | AIFF             | AIFF Chunk / ID3                   |      Supported       |      Yes (`pcm_s*`)      |     Supported     |
+| `.wv`            | WavPack          | APEv2 / WavPack Tags               |      Supported       |     Yes (`wavpack`)      |     Supported     |
+| `.ape`           | Monkey's Audio   | APEv2 Tags                         |      Supported       |       Yes (`ape`)        | No (Decode only)  |
+| `.mpc`           | Musepack         | APEv2 Tags                         |      Supported       |     No (`musepack`)      | No (Decode only)  |
+| `.wma`           | ASF              | Windows Media Tags                 |      Supported       |       No (`wmav2`)       | No (Decode only)  |
+| `.dsf` / `.dff`  | DSD              | ID3v2 (DSF)                        |      Supported       |      Yes (`dsd_*`)       | No (Decode only)  |
+
+---
+
+## Audiophile DSP & Transcoding Engine Specification
+
+`MediaConverter` provides studio-grade DSP processing powered by FFmpeg with SoX resampling, anti-aliasing filtering, and dithering:
+
+### 1. High-Precision SoX Resampler
+
+When changing sample rates (e.g. 96 kHz / 48 kHz to 44.1 kHz CD audio), the engine applies the **SoX (Sound eXchange) resampler filter**:
+
+```bash
+-af "aresample=resampler=soxr:precision=28:cutoff=0.99"
+```
+
+- **Precision (28 bits)**: Provides 168 dB of signal-to-noise dynamic range, well beyond the 144 dB theoretical limit of 24-bit audio.
+- **Passband Cutoff (0.99)**: Preserves 99% of the passband frequency spectrum (e.g., flat up to 21.8 kHz on a 44.1 kHz master) while guaranteeing rejection of imaging frequencies above Nyquist.
+
+### 2. Triangular & Noise-Shaped Dithering
+
+When reducing bit depth (e.g. from 24-bit or 32-bit floating point down to 16-bit integer PCM):
+
+- **Triangular Dithering (`aresample=dither_method=triangular`)**: Generates high-pass triangular probability density function (TPDF) noise, completely eliminating quantization distortion and correlation errors without altering frequency balance.
+- **Lipshitz Noise-Shaping (`aresample=dither_method=lipshitz`)**: Psychoacoustically curves quantization noise into higher, less sensitive auditory bands (14 kHz - 20 kHz), lowering perceived noise in the critical 1 kHz - 5 kHz range.
+
+### 3. Multichannel to Stereo Downmixing
+
+When downmixing 5.1 or 7.1 surround streams to stereo (`downmixStereo: true`), coefficients strictly follow the **ITU-R BS.775** standard:
+$$L = L_f + 0.7071 \cdot C + 0.7071 \cdot L_s$$
+$$R = R_f + 0.7071 \cdot C + 0.7071 \cdot R_s$$
+This guarantees dialog centeredness ($C$), surround ambiance preservation ($L_s, R_s$), and prevents clipping without dynamic range compression.
+
+---
+
+## Filesystem Security & Confinement Architecture
+
+All filesystem interactions are guarded by `PathSecurity` (`src/server/media/path-security.ts`), enforcing strict boundary protection:
+
+```mermaid
+flowchart TD
+    RawPath["User / API Path Parameter"] --> NullCheck{"Contains Null Byte (\\0)?"}
+    NullCheck -->|Yes| RejectNull["Throw 400 Bad Request (Null byte detected)"]
+    NullCheck -->|No| ResolvePath["path.resolve(cleanPath)"]
+
+    ResolvePath --> RealPath["fs.realpathSync() (Resolve Symlinks & Junctions)"]
+    RealPath --> ConfineCheck{"Does canonicalPath start with any ALLOWED_MEDIA_ROOTS?"}
+
+    ConfineCheck -->|No| RejectForbidden["Throw 403 Forbidden (Path outside allowed roots)"]
+    ConfineCheck -->|Yes| ExtCheck{"Is write operation & file extension safe?"}
+
+    ExtCheck -->|No| RejectExt["Throw 400 Bad Request (Invalid media extension)"]
+    ExtCheck -->|Yes| AuthorizedPath["Return Authorized Canonical Path"]
+```
+
+- **Symlink Resolution**: Uses native `realpath` to prevent directory traversal escapes via symlinked folders pointing outside the library root.
+- **Argument Array Execution**: Subprocesses are spawned using `execFile` with argument arrays, preventing OS command injection vulnerabilities.
+
+---
+
+## Media Subsystem Execution Flows
+
+### 1. Unified Metadata Read Flow
+
+The metadata read flow orchestrates `TagLib`, `FFprobe`, and optional `MediaInfo` concurrently to assemble a rich `CombinedAudioMetadata` object without redundant disk reads:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as HTTP Client
+    participant Route as GET /api/media/metadata
+    participant Coord as MetadataCoordinator
+    participant Sec as PathSecurity
+    participant TagLib as TagLibAdapter (node-taglib2)
+    participant Probe as FFprobeAdapter
+    participant QC as MediaInfoAdapter
+    participant Art as Artwork Cache
+
+    Client->>Route: GET /api/media/metadata?path=/music/track.flac&includeQC=true
+    Route->>Route: Validate query with singleMetadataQuerySchema (Zod)
+    Route->>Coord: read(path, { includeQC: true, extractArtwork: true })
+    Coord->>Sec: authorizeInputPath(path)
+    Sec-->>Coord: canonicalPath
+    Coord->>Coord: fs.promises.stat(canonicalPath) -> size & mtime
+
+    par Concurrent Engine Execution via Promise.all
+        Coord->>TagLib: readTags(canonicalPath)
+        TagLib->>TagLib: Inspect via native N-API bindings
+        TagLib-->>Coord: AudioTags & rawProperties
+    and
+        Coord->>Probe: probe(canonicalPath)
+        Probe->>Probe: execFile(ffprobe, [-v quiet, -print_format json, ...])
+        Probe-->>Coord: TechnicalAudioInfo (codec, bitrate, sampleRate, isLossless)
+    and
+        opt includeQC is true
+            Coord->>QC: inspect(canonicalPath)
+            QC->>QC: execFile(MediaInfo, [--Output=JSON, ...])
+            QC-->>Coord: MediaInfoQC (bitrateMode, bitDepth, encoderSettings)
+        end
+    and
+        Coord->>Art: extractArtwork(canonicalPath)
+        Art->>Art: Compute SHA-256 key: sha256(path:size:mtimeMs)[0..23]
+        alt Cache Miss
+            Art->>TagLib: extractCoverArtBuffer(canonicalPath)
+            TagLib-->>Art: rawBuffer
+            Art->>Art: Sniff magic bytes (JPEG/PNG/WebP) & save to cache/art/<key>.<ext>
+        end
+        Art-->>Coord: ExtractedArtwork (cachedPath, dimensions, mimeType)
+    end
+
+    Coord-->>Route: CombinedAudioMetadata
+    Route-->>Client: 200 OK (ApiResponse<CombinedAudioMetadata>)
+```
+
+---
+
+### 2. Crash-Safe Tag Writing Flow
+
+When modifying audio tags (`PATCH /api/media/tags` or `POST /api/media/tags/batch`), operations pass through strict validation and crash-safe filesystem guarantees:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as HTTP Client
+    participant Route as PATCH /api/media/tags
+    participant Coord as MetadataCoordinator
+    participant Sec as PathSecurity
+    participant TagLib as TagLibAdapter (node-taglib2)
+    participant Mapper as TagMapper
+    participant FS as File System
+    participant Cache as Artwork Cache
+
+    Client->>Route: PATCH /api/media/tags { path, tags: WriteAudioTags, preserveOriginal }
+    Route->>Route: Validate body with writeTagsRequestSchema (Zod)
+    Route->>Coord: writeTags(path, tags, { preserveOriginal })
+    Coord->>Sec: authorizeInputPath(path)
+    Sec-->>Coord: canonicalPath
+    Coord->>Mapper: toTagLibProperties(tags)
+    Mapper-->>Coord: propertyMap
+
+    opt preserveOriginal is true
+        Coord->>FS: Hard-link or copy canonicalPath -> <name>.<ext>_original
+    end
+
+    Coord->>TagLib: writeProperties(canonicalPath, propertyMap)
+
+    alt In-Place Update (Fits Existing Padding)
+        TagLib->>FS: Update header in-place (audio data untouched)
+    else Padding Exceeded (Reallocation Required)
+        TagLib->>FS: Write to temporary sibling: .<name>.tmp_<uuid>
+        TagLib->>FS: fsync() & restore atime/mtime via utimes()
+        TagLib->>FS: Atomic rename over target file
+    end
+
+    Coord->>Cache: Invalidate cached artwork for file
+    Coord-->>Route: TagWriteResult { success: true, filePath, updatedTags }
+    Route-->>Client: 200 OK (ApiResponse<TagWriteResult>)
+```
+
+---
+
+### 3. Technical Audio Inspection & Mathematical Lossless Verification
+
+`FFprobeAdapter` extracts stream specifications and mathematically validates codec integrity against the lossless registry:
+
+```mermaid
+flowchart TD
+    Start["FFprobeAdapter.probe(filePath)"] --> Auth["PathSecurity.authorizeInputPath(filePath)"]
+    Auth --> Exec["execFile(ffprobe, ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', filePath])"]
+    Exec --> Parse["JSON.parse(stdout) -> streams[], format{}"]
+
+    Parse --> FindAudio["Locate first stream where codec_type === 'audio'"]
+    FindAudio --> Metrics["Extract: duration, bitrate, sampleRate, channels, channelLayout"]
+
+    Metrics --> BitDepth{"Inspect bit depth\nbits_per_sample > 0?"}
+    BitDepth -->|Yes| SetBits["bitsPerSample = stream.bits_per_sample"]
+    BitDepth -->|No| CheckRaw["Parse stream.bits_per_raw_sample"]
+    CheckRaw --> SetBitsRaw["bitsPerSample = rawBits"]
+
+    SetBits --> LosslessCheck{"Evaluate Lossless Criteria"}
+    SetBitsRaw --> LosslessCheck
+
+    LosslessCheck --> LosslessSet["Match against LOSSLESS_CODECS:\nflac, alac, ape, wavpack, truehd, mlp, tak, shorten,\npcm_s16le/be, pcm_s24le/be, pcm_s32le/be,\npcm_f32le/be, pcm_f64le/be, dsd_*"]
+    LosslessCheck --> WavCheck["Or: containerFormat === 'wav' AND codec starts with 'pcm'"]
+
+    LosslessSet --> Output["Assemble TechnicalAudioInfo"]
+    WavCheck --> Output
+```
+
+---
+
+### 4. Zero-Remuxing Artwork Extraction & Caching
+
+Embedded album artwork is extracted directly via TagLib without container remuxing, validated using zero-dependency magic byte sniffing, and cached deterministically:
+
+```mermaid
+flowchart TD
+    Call["MetadataCoordinator.extractArtwork(filePath, forceRefresh)"] --> Stat["fs.stat(filePath)"]
+    Stat --> Hash["Compute SHA-256 Cache Key:\nsha256(filePath + ':' + size + ':' + mtimeMs).slice(0, 24)"]
+
+    Hash --> ForceCheck{"forceRefresh == true?"}
+    ForceCheck -->|No| CheckCache["Search cache/art/cacheKey.(jpg|png|webp)"]
+    ForceCheck -->|Yes| StageExtract
+
+    CheckCache --> CacheFound{"Cache file exists & size > 100 bytes?"}
+    CacheFound -->|Yes| ReturnCache["Return ExtractedArtwork (source: 'cache')"]
+    CacheFound -->|No| StageExtract
+
+    subgraph StageExtract["Extraction & Format Sniffing"]
+        ExtractTagLib["TagLibAdapter.extractCoverArtBuffer(filePath)"]
+        ExtractTagLib --> BufCheck{"Buffer returned & length > 100 bytes?"}
+        BufCheck -->|Yes| SniffBytes["Sniff Magic Bytes:\nJPEG: 0xFF 0xD8 0xFF\nPNG: 0x89 0x50 0x4E 0x47\nWebP: RIFF....WEBP"]
+        SniffBytes --> WriteDisk["Write buffer to cache/art/cacheKey.format"]
+        WriteDisk --> ReturnExtract["Return ExtractedArtwork (source: 'taglib')"]
+        BufCheck -->|No| ReturnNull["Return null (No artwork embedded)"]
+    end
+```
+
+---
+
+### 5. Audiophile Media Transcoding Pipeline
+
+`MediaConverter` executes audiophile-grade conversions with SoX 28-bit precision resampling, dithering, and real-time progress parsing:
+
+```mermaid
+flowchart TD
+    Request["POST /api/media/convert { inputPath, outputPath, targetFormat, ... }"] --> Validate["Validate via convertMediaRequestSchema (Zod)"]
+    Validate --> AuthPaths["PathSecurity: Authorize inputPath & outputPath against ALLOWED_MEDIA_ROOTS"]
+    AuthPaths --> BuildArgs["Build FFmpeg Argument Vector:\n-i inputPath\n-af aresample=resampler=soxr:precision=28:cutoff=0.99\n-af aresample=dither_method=triangular (if bit depth reduced)\n-ac 2 (if downmixStereo enabled)\n-progress pipe:1"]
+
+    BuildArgs --> Spawn["Spawn FFmpeg Child Process (LGPL build)"]
+    Spawn --> TempFile["Write to temporary file in destination: .<name>.tmp_<uuid>"]
+
+    subgraph Monitor["Non-Blocking Progress Monitor"]
+        Spawn --> ParseProgress["Parse pipe:1 stdout:\nout_time_us=...\nspeed=...\nprogress=continue"]
+        ParseProgress --> Callback["Emit ConversionProgressCallback"]
+    end
+
+    Spawn --> ExitCheck{"Process exit code == 0?"}
+    ExitCheck -->|Yes| Rename["Atomic rename: temp file -> final destination"]
+    Rename --> Response["Return 201 Created (ApiResponse<ConversionResult>)"]
+    ExitCheck -->|No| Cleanup["Unlink temp file & throw ConversionError"]
+```
+
+---
+
+### 6. High-Throughput Batch Processing Flows
+
+For bulk operations, concurrent workloads are bounded to prevent CPU and I/O starvation:
+
+```mermaid
+flowchart TD
+    subgraph BatchMeta["Batch Metadata Read (POST /api/media/metadata/batch)"]
+        FileList["File Paths Array [1..500]"] --> ChunkSlice["Slice into chunks of 50 files"]
+        ChunkSlice --> WorkerLoop["Bounded Worker Loop (concurrency = 8)"]
+        WorkerLoop --> SingleRead["MetadataCoordinator.read(filePath)"]
+        SingleRead --> Collect["Collect results and failures"]
+        Collect --> Assemble["Return BatchMetadataResponse { total, results, failures }"]
+    end
+```
+
+---
+
+### 7. Failure Recovery, Resilience & Lifecycle Matrix
+
+| Failure Mode                           | Detection Point                    | Recovery & Mitigation Strategy                                                                    | Resulting Client Response                                            |
+| :------------------------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------- |
+| **File Not Found**                     | `PathSecurity` (`fs.existsSync`)   | Short-circuits immediately before spawning any child process or allocating buffers.               | `404 Not Found` (`NotFoundError`)                                    |
+| **Path Traversal Escape**              | `PathSecurity.authorizeInputPath`  | Resolves canonical `realpath` and tests membership within `ALLOWED_MEDIA_ROOTS`.                  | `403 Forbidden` (`ForbiddenError`)                                   |
+| **Corrupted Audio Header**             | `TagLib` / `FFprobe` parser        | Process returns non-zero error. Caught in coordinator; logs error and isolates failure.           | In single: `500 Internal Error`; In batch: recorded in `failures[]`. |
+| **Padding Exceeded on Write**          | `TagLibAdapter`                    | Automatically writes to temporary sibling file (`.<name>.tmp_<uuid>`) and performs atomic rename. | `200 OK` (Tag write succeeds seamlessly).                            |
+| **Conversion Process Crash / Timeout** | `MediaConverter`                   | Monitors exit signals, removes any incomplete temporary output file, and rejects execution.       | `500 Internal Error` (`ConversionError`).                            |
+| **LGPL Non-Compliance**                | `ToolInspector`                    | Checks `ffmpeg -version` for `--enable-gpl` or `--enable-nonfree` flags.                          | Warning logged; reported via `/api/health/media`.                    |
+| **Missing Artwork**                    | `MetadataCoordinator`              | Fails gracefully if no embedded cover art picture blocks exist.                                   | `404 Not Found` on artwork API; `artwork: null` on metadata read.    |
+| **Process Termination / Shutdown**     | `process.on('SIGINT' / 'SIGTERM')` | Kills active FFmpeg child processes (`q` → `SIGTERM` → `SIGKILL`) to prevent orphaned tasks.      | Clean OS process exit.                                               |
+
+---
+
+## Standardized API Error Code Catalog
+
+The application translates domain exceptions, Zod validation issues, and engine errors into a predictable JSON error structure via `handleRouteError`:
+
+| HTTP Status | Error Code              | Description / Trigger Scenario                                           | Frontend Recommendation                   |
+| :---------: | :---------------------- | :----------------------------------------------------------------------- | :---------------------------------------- |
+|   **400**   | `BAD_REQUEST`           | Malformed JSON syntax or invalid file extension                          | Display user-facing notification          |
+|   **401**   | `UNAUTHORIZED`          | Missing authentication credentials or invalid session token              | Redirect to login                         |
+|   **403**   | `FORBIDDEN`             | Target file path lies outside `ALLOWED_MEDIA_ROOTS`                      | Alert user that file is outside library   |
+|   **404**   | `NOT_FOUND`             | File does not exist on disk or has no embedded artwork                   | Render empty artwork fallback placeholder |
+|   **409**   | `CONFLICT`              | Concurrent write collision or duplicate resource identifier              | Prompt user to retry operation            |
+|   **422**   | `VALIDATION_ERROR`      | Schema validation failure; carries structured `details: ApiFieldError[]` | Highlight invalid form fields             |
+|   **429**   | `RATE_LIMITED`          | Request rate limit exceeded                                              | Throttle subsequent requests              |
+|   **500**   | `INTERNAL_SERVER_ERROR` | Native binary crash, subprocess failure, or unhandled exception          | Log error identifier for support          |
 
 ---
 
@@ -21,8 +515,9 @@ A modern, high-performance web audio library and music metadata manager built wi
 Ensure the following tools are installed and accessible in your system `PATH` (or configure their absolute paths in `.env`):
 
 - **Node.js**: v20 or newer
-- **ExifTool**: [exiftool.org](https://exiftool.org/) (e.g., `exiftool` on PATH or `C:\ExifTool\exiftool.exe`)
-- **FFmpeg & FFprobe**: [ffmpeg.org](https://ffmpeg.org/) (e.g., `ffmpeg` and `ffprobe` on PATH or `C:\ffmpeg\bin\*.exe`)
+- **FFmpeg & FFprobe**: [ffmpeg.org](https://ffmpeg.org/) (LGPL build, e.g. `ffmpeg` and `ffprobe` on `PATH`)
+- **MediaInfo CLI**: [mediaarea.net](https://mediaarea.net/) (e.g. `MediaInfo` on `PATH`)
+- **TagLib**: Built-in via `node-taglib2` (native N-API bindings) or standalone `taglib-worker` executable
 
 ### 2. Install Project Dependencies
 
@@ -32,395 +527,31 @@ npm install
 
 ### 3. Environment Configuration
 
-Copy the example environment file and customize your configuration if needed:
+Copy the example environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-| Variable | Default | Description |
-| :--- | :--- | :--- |
-| `NODE_ENV` | `development` | Runtime environment (`development`, `production`, `test`) |
-| `PORT` | `3000` | Port for the Next.js HTTP server |
-| `EXIFTOOL_PATH` | `exiftool` | Path or binary name for ExifTool CLI |
-| `FFMPEG_PATH` | `ffmpeg` | Path or binary name for FFmpeg CLI |
-| `FFPROBE_PATH` | `ffprobe` | Path or binary name for FFprobe CLI |
-| `ART_CACHE_DIR` | `cache/art` | Directory for caching extracted album artwork |
-
----
-
-## Media Subsystem Execution Flow & Architecture
-
-The media subsystem (`src/server/media` and `src/features/media`) is the core engine of the application. It handles audio metadata extraction, deep stream inspection, high-performance tag editing, and album artwork extraction with deterministic caching. It coordinates three underlying CLI binary tools (**ExifTool**, **FFmpeg**, and **FFprobe**) through a resilient multi-layered pipeline.
-
-### Architectural Layering & Boundaries
-
-```mermaid
-flowchart TD
-    subgraph ClientLayer["Client & Consumer Layer"]
-        UI["Web UI / Ark UI Components"]
-        API_Client["Bruno / External HTTP Clients"]
-    end
-
-    subgraph RouteLayer["Presentation & Routing (src/app/api/media)"]
-        R_Meta["/api/media/metadata\n(GET / POST)"]
-        R_Tech["/api/media/technical\n(GET)"]
-        R_Tags["/api/media/tags\n(POST & batch)"]
-        R_Art["/api/media/artwork\n(GET stream / POST)"]
-    end
-
-    subgraph FeatureLayer["Feature Domain (src/features/media)"]
-        ZodSchemas["Zod Schemas\n(metadata, technical, tags, artwork)"]
-    end
-
-    subgraph ServerLayer["Server Infrastructure (src/server/media) - server-only"]
-        Coordinator["MetaReader\n- Parallel Inspection Orchestration\n- Tag Normalizer & Artwork Cache\n- In-Flight Extraction Deduplication"]
-        ExifClient["ExifClient (Stay-Open Daemon)\n- FIFO Command Queue & Protocol Parser\n- Metadata Reads & Atomic Tag Writes\n- Binary Artwork Extraction (-b -Tag -W!)\n- Process Lifecycle & Crash Recovery"]
-        AudioProber["AudioProber (Stateless)\n- FFprobe JSON Stream Inspector\n- Lossless Codec Matrix & Attached Picture Detection\n- Bounded-Concurrency Worker Pool"]
-    end
-
-    subgraph ExternalLayer["OS & External Runtime"]
-        ExifToolBin["ExifTool Process\n(-stay_open True -@ -)"]
-        FFprobeBin["FFprobe CLI"]
-        DiskCache["Disk Cache\n(cache/art/*.jpg|png|webp|gif)"]
-        AudioFiles["Audio Filesystem\n(FLAC, ALAC, MP3, AAC, OGG, WAV)"]
-    end
-
-    UI --> RouteLayer
-    API_Client --> RouteLayer
-
-    R_Meta --> ZodSchemas --> Coordinator
-    R_Tech --> ZodSchemas --> AudioProber
-    R_Tags --> ZodSchemas --> ExifClient
-    R_Art --> ZodSchemas --> Coordinator
-
-    Coordinator --> ExifClient
-    Coordinator --> AudioProber
-    Coordinator <--> DiskCache
-
-    ExifClient <-->|IPC stdio pipe| ExifToolBin
-    AudioProber -->|execFile JSON| FFprobeBin
-    ExifToolBin <--> AudioFiles
-    FFprobeBin <--> AudioFiles
-```
-
----
-
-### Detailed Component Roles & Internal State
-
-| Component | Location | Primary Responsibilities & Design Patterns |
-| :--- | :--- | :--- |
-| **`MetaReader`** | `src/server/media/meta/reader.ts` | **Multi-Source Orchestrator**: Executes `AudioProber` and `ExifClient` concurrently via `Promise.all`. Normalizes conflicting tags into unified `AudioTags`. Manages disk artwork caching (`cache/art`), in-flight extraction request deduplication, and magic-byte format validation. |
-| **`ExifClient`** | `src/server/media/exif/client.ts` | **Persistent Process Daemon**: Maintains a single long-lived ExifTool process using `-stay_open True -@ -`. Eliminates ~235ms Perl startup overhead per call. Implements FIFO command queue, atomic tag writing with optional backups, crash auto-recovery, and direct binary artwork extraction (`-b -Tag -W!`). |
-| **`AudioProber`** | `src/server/media/ffprobe/reader.ts` | **Stream Specification Engine**: Direct-instantiation client that executes `ffprobe` to extract audio technical metrics. Evaluates audio streams against lossless codecs, checks bit depth, sample rates, duration, attached-picture disposition, and provides bounded concurrency worker pools. |
-
----
-
-### 1. Unified Metadata Inspection Execution Flow
-
-The primary read flow orchestrates `FFprobe` and `ExifTool` concurrently to return a rich `CombinedAudioMetadata` object.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as HTTP Client
-    participant Route as GET /api/media/metadata
-    participant Reader as MetaReader
-    participant Probe as AudioProber (FFprobe)
-    participant Exif as ExifClient (ExifTool)
-
-    Client->>Route: GET /api/media/metadata?path=/music/track.flac
-    Route->>Route: Parse & validate query with singleMetadataQuerySchema (Zod)
-    Route->>Reader: read(path)
-    Reader->>Reader: fs.promises.stat() -> get file size & mtime
-    alt File does not exist / inaccessible
-        Reader-->>Route: throw Error
-        Route-->>Client: 404 Not Found (ApiError envelope via handleRouteError)
-    end
-
-    par Parallel Extraction via Promise.all
-        Reader->>Probe: inspect(resolvedPath)
-        Probe->>Probe: execFile(ffprobe, [-v quiet, -print_format json, ...])
-        Probe-->>Reader: TechnicalAudioInfo (codec, bitrate, sampleRate, isLossless)
-    and
-        Reader->>Exif: readMetadata(resolvedPath)
-        Exif->>Exif: enqueue command -> persistent stay-open pipe
-        Exif-->>Reader: ExifRawRecord (raw tags map)
-    and
-        Reader->>Reader: extractArtwork(resolvedPath, forceRefresh=false)
-        Reader->>Reader: Check SHA-256 cache key in cache/art
-        alt Cache Miss
-            Reader->>Exif: extractArtwork(sourcePath, temporaryPath)
-            Exif-->>Reader: write binary to disk -> validate magic bytes
-        end
-    end
-
-    Reader->>Reader: normalizeAudioTags(rawExif)
-    Reader-->>Route: CombinedAudioMetadata
-    Route-->>Client: 200 OK (ApiSuccess<CombinedAudioMetadata>)
-```
-
-#### Tag Normalization Logic (`normalizeAudioTags`)
-Heterogeneous audio formats store metadata under differing container tags. The normalizer evaluates priorities:
-- **Title / Artist / Album**: Scans `ID3:Title` → `Vorbis:TITLE` → `QuickTime:Title` → `RIFF:Title`.
-- **Artists Array**: Maps `artist` and multiple values if found.
-- **Genre Multi-Values**: Splits string entries on delimiter patterns `[,;/]` and flattens arrays into normalized `string[]`.
-- **Track & Disc Numbers**: Parses composite `"4/12"` strings into numeric `trackNumber: 4` and `trackTotal: 12`. Falls back to standalone `TrackTotal` or `TotalTracks`.
-- **Date & Year**: Extracts 4-digit years using regex `/\b(19\d\d|20\d\d)\b/` across `RecordingTime`, `ReleaseDate`, and `Year`.
-- **ReplayGain**: Normalizes `TrackGain`, `TrackPeak`, `AlbumGain`, and `AlbumPeak`.
-
----
-
-### 2. High-Performance ExifTool Stay-Open Subsystem
-
-To overcome the heavy Perl startup cost (~250ms per CLI invocation), `ExifClient` uses ExifTool's native daemon mode (`-stay_open True -@ -`). Commands run in ~15ms.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Caller as Coordinator / Service
-    participant Client as ExifClient
-    participant Queue as Command FIFO Queue
-    participant Engine as Stay-Open Protocol Engine
-    participant Proc as ExifTool Child Process
-
-    Caller->>Client: execute(args)
-    Client->>Client: Validate args, verify queue < maxQueueSize (500)
-    Client->>Queue: push({ id: ++seq, args, resolve, reject })
-    Client->>Engine: runNext()
-
-    alt Process not running or crashed
-        Engine->>Proc: spawn(binaryPath, ['-stay_open', 'True', '-@', '-', ...])
-        Engine->>Engine: Attach stdout, stderr, exit, error listeners
-    end
-
-    Engine->>Queue: shift() -> currentRequest
-    Engine->>Engine: Start 25s execution timeout timer (timeoutId)
-    Engine->>Engine: buildCommand(request)
-    Note over Engine: Escapes args with #[CSTR]...\nAppends -echo3 __EXIF_STATUS_${id}_${status}__\nAppends -execute${id}
-    Engine->>Proc: stdin.write(payload)
-
-    loop Stream Reading
-        Proc-->>Engine: stdout data chunk
-        Engine->>Engine: Accumulate in outputBuffer
-        Engine->>Engine: Check maxOutputBytes (10 MiB limit)
-        Engine->>Engine: Search for ready marker: {ready${id}}
-    end
-
-    Engine->>Engine: Extract raw output up to ready marker
-    Engine->>Engine: Parse status marker regex: __EXIF_STATUS_${id}_(\d+)__
-    Engine->>Engine: clearTimeout(timeoutId)
-
-    alt Status == 0 (Success)
-        Engine->>Client: resolveCurrent(output)
-        Client-->>Caller: JSON / string output
-    else Status != 0 or Parsing Error
-        Engine->>Client: rejectCurrent(Error with stderr details)
-        Client-->>Caller: throw Error
-    end
-
-    Engine->>Engine: runNext() (process next queued item)
-```
-
-#### Protocol Framing & Guardrails
-- **C-String Argument Escaping**: All arguments are prepended with `#[CSTR]` and escaped (`\` → `\\`, `\r` → `\r`, `\n` → `\n`, `\t` → `\t`). Null bytes (`\0`) are strictly rejected.
-- **Delimiter Tracking**: The client monitors stdout for the unique string `{ready${id}}`. Output before this delimiter is extracted, and remainder bytes stay in the buffer.
-- **Return Code Extraction**: ExifTool echoes `-echo3 __EXIF_STATUS_${id}_${status}__`. The status code is verified: `0` is success; non-zero throws with captured `stderr` context.
-- **Command Timeout**: Active commands are limited to 25 seconds (`DEFAULT_TIMEOUT_MS`). The timer only starts when the command leaves the queue and reaches `stdin`.
-- **Buffer Safety**: If `outputBytes > 10 MiB`, the process is immediately killed (`SIGKILL`), reset, and the request is rejected to protect against out-of-memory crashes.
-- **Batch Chunking & Error Isolation**: When reading hundreds of files (`readBatch`), requests are chunked in groups of 40 (`chunkSize = 40`). If a chunk fails (e.g. one corrupted audio header causes ExifTool to exit), the client catches the failure and automatically retries each file in that chunk individually, ensuring healthy files are never lost.
-
----
-
-### 3. Technical Audio Inspection & Mathematical Lossless Verification
-
-`AudioProber` interfaces with `ffprobe` to pull exact technical specifications and verify codec integrity.
-
-```mermaid
-flowchart TD
-    Start["AudioProber.inspect(filePath)"] --> Resolve["path.resolve() & fs.existsSync()"]
-    Resolve --> Exec["execFile(ffprobe, ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', filePath])"]
-    Exec --> Parse["JSON.parse(stdout) -> streams[], format{}"]
-    
-    Parse --> FindAudio["Locate first stream where codec_type === 'audio'"]
-    FindAudio --> Metrics["Extract: duration, bitrate, sampleRate, channels, channelLayout"]
-    
-    Metrics --> BitDepth{"Inspect bit depth\nbits_per_sample > 0?"}
-    BitDepth -->|Yes| SetBits["bitsPerSample = stream.bits_per_sample"]
-    BitDepth -->|No| CheckRaw["Parse stream.bits_per_raw_sample"]
-    CheckRaw --> SetBitsRaw["bitsPerSample = rawBits"]
-    
-    SetBits --> LosslessCheck{"Check Lossless Criteria"}
-    SetBitsRaw --> LosslessCheck
-
-    LosslessCheck --> LosslessSet["Match against LOSSLESS_CODECS Set:\nflac, alac, ape, wavpack, truehd, mlp, tak, shorten,\npcm_s16le/be, pcm_s24le/be, pcm_s32le/be,\npcm_f32le/be, pcm_f64le/be, dsd_*"]
-    LosslessCheck --> WavCheck["Or: containerFormat === 'wav' AND codec starts with 'pcm'"]
-    
-    LosslessSet --> Output["Assemble TechnicalAudioInfo"]
-    WavCheck --> Output
-```
-
-#### Lossless Codecs Registry
-Mathematical lossless verification is performed against the `LOSSLESS_CODECS` set:
-- **PCM**: `pcm_s16le`, `pcm_s16be`, `pcm_s24le`, `pcm_s24be`, `pcm_s32le`, `pcm_s32be`, `pcm_f32le`, `pcm_f32be`, `pcm_f64le`, `pcm_f64be`.
-- **High-Resolution Containers**: `flac`, `alac`, `ape`, `wavpack`, `truehd`, `mlp`, `tak`, `shorten`.
-- **Direct Stream Digital (DSD)**: `dsd_lsbf`, `dsd_msbf`, `dsd_lsbf_planar`, `dsd_msbf_planar`.
-- **WAV Streams**: Any WAV container packaging PCM audio.
-
----
-
-### 4. Dual-Stage Album Artwork Extraction & Caching Pipeline
-
-`ArtExtractor` deterministically identifies, extracts, verifies, and caches album artwork.
-
-```mermaid
-flowchart TD
-    Call["ArtExtractor.extract(filePath, forceRefresh)"] --> Stat["fs.statSync(filePath)"]
-    Stat --> Hash["Compute SHA-256 Cache Key:\nsha256(filePath + ':' + size + ':' + mtimeMs).slice(0, 24)"]
-    
-    Hash --> ForceCheck{"forceRefresh == true?"}
-    ForceCheck -->|No| CheckCache["findCached(cacheKey):\nSearch cache/art/cacheKey.(jpg|png|webp|gif)"]
-    ForceCheck -->|Yes| Stage1
-    
-    CheckCache --> CacheFound{"File exists & size > 100 bytes?"}
-    CacheFound -->|Yes| ReturnCache["Return ExtractedArtwork (source: 'cache')"]
-    CacheFound -->|No| Stage1
-
-    subgraph Stage1["Stage 1: Primary Extraction (FFmpeg)"]
-        FFmpegRun["Spawn FFmpeg:\nffmpeg -y -v quiet -i audioPath -an -vcodec copy tempPath"]
-        FFmpegRun --> TempCheck{"tempPath exists & size > 100 bytes?"}
-        TempCheck -->|Yes| Sniff1["detectImageFormat(tempPath) via Magic Bytes"]
-        Sniff1 --> Rename["Atomic rename: tempPath -> cache/art/cacheKey.format"]
-        Rename --> ReturnFFmpeg["Return ExtractedArtwork (source: 'ffmpeg')"]
-    end
-
-    TempCheck -->|No| Stage2
-
-    subgraph Stage2["Stage 2: Fallback Extraction (ExifTool)"]
-        ExifTags["Iterate Picture Tags:\n-Picture, -CoverArt, -UserDefinedPicture, -PreviewImage"]
-        ExifTags --> SpawnExif["Spawn ExifTool Binary Stream:\nexiftool -b <tag> audioPath"]
-        SpawnExif --> BufCheck{"Buffer received & size > 100 bytes?"}
-        BufCheck -->|Yes| Sniff2["detectImageFormatFromBuffer(buffer) via Magic Bytes"]
-        Sniff2 --> WriteDisk["Write buffer to cache/art/cacheKey.format"]
-        WriteDisk --> ReturnExif["Return ExtractedArtwork (source: 'exiftool')"]
-        BufCheck -->|No| NextTag{"More tags in list?"}
-        NextTag -->|Yes| ExifTags
-    end
-
-    NextTag -->|No| ReturnNull["Return null (No artwork available)"]
-```
-
-#### Magic Byte Sniffing Matrix
-Extracted binary payloads are checked at the byte level before writing to disk, avoiding corrupt or misnamed images:
-- **JPEG**: `0xFF 0xD8 0xFF`
-- **PNG**: `0x89 0x50 0x4E 0x47` (`\x89PNG`)
-- **WebP**: `0x52 0x49 0x46 0x46` (`RIFF`) at offset 0, and `0x57 0x45 0x42 0x50` (`WEBP`) at offset 8
-- **GIF**: `0x47 0x49 0x46` (`GIF`)
-
-#### HTTP Binary Streaming & Caching
-When a client requests `GET /api/media/artwork?file=<filename>`:
-1. `MetaReader.findArtwork()` runs `path.basename(file)` to strictly eliminate path traversal attacks (`../`).
-2. Checks `cache/art/<filename>` on disk.
-3. Streams the binary payload via web `ReadableStream` with production caching headers:
-   ```http
-   HTTP/1.1 200 OK
-   Content-Type: image/jpeg
-   Content-Length: 124580
-   Cache-Control: public, max-age=31536000, immutable
-   Content-Disposition: inline; filename="a1b2c3d4e5f6.jpg"
-   ```
-
----
-
-### 5. Metadata Tag Writing Execution Flow
-
-When updating or deleting metadata (`PATCH /api/media/tags` or `PATCH /api/media/tags/batch`), operations pass through strict tag sanitization:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as HTTP Client
-    participant Route as PATCH /api/media/tags
-    participant Exif as ExifClient
-    participant File as Filesystem Audio File
-
-    Client->>Route: PATCH /api/media/tags { path, tags, preserveOriginal }
-    Route->>Route: Validate via writeTagsRequestSchema
-    Route->>Exif: writeTags(input.path, input.tags, options)
-
-    Exif->>Exif: Validate tag keys (reject leading '-', linebreaks)
-    Exif->>Exif: Build arguments:
-    Note over Exif: -charset filename=utf8\n-overwrite_original (if !preserveOriginal)\n-P (preserve timestamp)\n-Tag= (if null / empty -> deletion)\n-Tag+=val (if array -> append)\n-Tag=val (if string / number -> set)
-    Exif->>Exif: execute(args) via stay-open daemon
-
-    Exif->>File: Write tags into audio container
-    alt preserveOriginal is true
-        File-->>Exif: Creates original backup (track.flac_original)
-    end
-
-    Exif-->>Route: TagWriteResult { success: true, filePath, backupPath }
-    Route-->>Client: 200 OK (ApiSuccess<TagWriteResult>)
-```
-
----
-
-### 6. High-Throughput Batch Processing Flows
-
-For large music libraries, the media subsystem uses distinct concurrency mechanisms tailored to each tool's architecture:
-
-```mermaid
-flowchart TD
-    subgraph BatchMeta["Batch Metadata Read (POST /api/media/metadata/batch)"]
-        FileList["File Paths List [1..N]"] --> Split["Split Execution into 2 Concurrent Branches"]
-        
-        Split --> BranchExif["Branch 1: ExifTool Batch Reader"]
-        Split --> BranchProbe["Branch 2: FFprobe Worker Pool"]
-
-        subgraph ExifChunking["ExifTool Native Multi-File Chunking"]
-            BranchExif --> Chunk40["Slice into chunks of 40 files"]
-            Chunk40 --> ExecChunk["execute(['-j', ...40Paths])"]
-            ExecChunk --> ChunkOk{"Chunk succeeds?"}
-            ChunkOk -->|Yes| ParseExif["Map records by SourceFile"]
-            ChunkOk -->|No| Retry1["Fallback: Retry each of the 40 files individually"]
-            Retry1 --> ParseExif
-        end
-
-        subgraph ProbePool["FFprobe Bounded Concurrency Pool"]
-            BranchProbe --> Workers["Spawn 8 Concurrent Workers\n(concurrency = 8)"]
-            Workers --> QueueLoop["Iterate atomic shared index:\nnextIndex++ < totalFiles"]
-            QueueLoop --> ExecProbe["AudioProber.inspect(file)"]
-            ExecProbe --> MapProbe["Map TechnicalAudioInfo by resolvedPath"]
-        end
-
-        ParseExif --> Join["Promise.all joins both maps"]
-        MapProbe --> Join
-        Join --> ArtLoop["Iterate files -> Non-blocking ArtExtractor.extract()"]
-        ArtLoop --> StatFiles["fs.statSync() & normalizeAudioTags()"]
-        StatFiles --> ReturnBatch["Return BatchMetadataResponse { total, results }"]
-    end
-```
-
----
-
-### 7. Failure Recovery, Resilience & Lifecycle Matrix
-
-| Failure Mode | Detection Point | Recovery & Mitigation Strategy | Resulting Client Response |
-| :--- | :--- | :--- | :--- |
-| **File Not Found** | `MediaService` (`fs.existsSync`) | Immediate short-circuit before spawning child processes or queuing jobs. | `404 Not Found` (`NotFoundError`) |
-| **Corrupted Audio Header** | `FFprobe` parser | Process returns non-zero error. Caught in worker loop; logs warning and skips file during batch scan. | In single: `500 Internal Server Error`; In batch: omitted from results. |
-| **ExifTool Daemon Crash** | `childProcess.once('exit')` | Process handle is cleared (`toolProcess = null`). Any active request is rejected. Subsequent command triggers automatic respawn. | Active request fails; subsequent requests automatically reinitialize daemon. |
-| **ExifTool Command Timeout** | 25-second active execution timer | Process is forcefully killed (`SIGKILL`), buffers cleared, current request rejected, and next queued command runs. | `500 Internal Server Error` with timeout message. |
-| **Stdout Buffer Overflow** | Buffer byte counter > 10 MiB | Process is immediately killed (`SIGKILL`), output discarded, preventing Node.js heap exhaustion. | `500 Internal Server Error` (`ExifTool output exceeded limit`). |
-| **Corrupted File in Batch** | `ExifClient.readBatch()` | If a 40-file batch fails, client intercepts failure and retries all 40 files individually. | The 39 valid files succeed; only the corrupt file is skipped. |
-| **No Embedded Artwork** | `ArtExtractor` | Dual-stage pipeline fails gracefully (FFmpeg temp file empty, ExifTool returns null buffer). | `404 Not Found` on artwork API; `artwork: null` on metadata inspect. |
-| **Path Traversal Attack** | `MediaService.getArtworkBinary` | Applies `path.basename(query.file)`, locking access to `cache/art` folder. | Safely resolves file or returns `404 Not Found`. |
-| **Process Termination / Shutdown** | Node `process.on('exit')` | Registered exit hook issues `-stay_open False\n` with a 2-second fallback timer before sending `SIGKILL`. | Clean process exit with no orphaned background daemons. |
+| Variable              | Default                 | Description                                                    |
+| :-------------------- | :---------------------- | :------------------------------------------------------------- |
+| `NODE_ENV`            | `development`           | Runtime environment (`development`, `production`, `test`)      |
+| `PORT`                | `3000`                  | Port for the Next.js HTTP server                               |
+| `ALLOWED_MEDIA_ROOTS` | `e:/Code/Next/my-music` | Semicolon/comma-separated list of allowed absolute directories |
+| `FFMPEG_PATH`         | `ffmpeg`                | Path or executable name for FFmpeg CLI                         |
+| `FFPROBE_PATH`        | `ffprobe`               | Path or executable name for FFprobe CLI                        |
+| `MEDIAINFO_PATH`      | `MediaInfo`             | Path or executable name for MediaInfo CLI                      |
+| `TAGLIB_WORKER_PATH`  | _(optional)_            | Path to standalone `taglib-worker` executable fallback         |
+| `METADATA_ENGINE`     | `native`                | Engine mode for metadata (`native` \| `wasm`)                  |
+| `PROBING_ENGINE`      | `native`                | Engine mode for probing (`native` \| `wasm`)                   |
+| `CONVERSION_ENGINE`   | `native`                | Engine mode for audio conversion (`native` \| `wasm`)          |
+| `ART_CACHE_DIR`       | `cache/art`             | Directory for caching extracted album artwork                  |
 
 ---
 
 ## API Reference
 
-All JSON endpoints adhere to the project `ApiResponse<T>` envelope standard:
+All JSON endpoints return a standardized `ApiResponse<T>` envelope:
 
 ```ts
 // Success Response
@@ -435,323 +566,410 @@ All JSON endpoints adhere to the project `ApiResponse<T>` envelope standard:
 {
   "success": false,
   "error": {
-    "code": "VALIDATION_ERROR" | "BAD_REQUEST" | "NOT_FOUND" | "INTERNAL_SERVER_ERROR",
+    "code": "VALIDATION_ERROR" | "NOT_FOUND" | "BAD_REQUEST" | "FORBIDDEN" | "INTERNAL_SERVER_ERROR",
     "message": "Human-readable description",
-    "details": [...] // Structured validation issues or debug context
+    "details": [...] // Structured validation field errors or debug context
   }
 }
 ```
 
 ---
 
-### 1. Audio Metadata APIs
+### 1. Health & Engine Diagnostics
+
+#### `GET /api/health`
+
+Fast, non-blocking process liveness probe.
+
+- **Example Response (200 OK)**:
+    ```json
+    {
+        "success": true,
+        "data": {
+            "status": "ok",
+            "uptime": 142.5,
+            "timestamp": "2026-10-28T02:00:00.000Z"
+        }
+    }
+    ```
+
+#### `GET /api/health/media`
+
+Deep diagnostic check of TagLib, FFprobe, MediaInfo, and FFmpeg binaries, verifying installation paths, versions, engine health, and LGPL licensing compliance.
+
+- **Example Response (200 OK)**:
+    ```json
+    {
+        "success": true,
+        "data": {
+            "status": "healthy",
+            "timestamp": "2026-10-28T02:00:00.000Z",
+            "engines": {
+                "metadata": {
+                    "status": "healthy",
+                    "engine": "native",
+                    "provider": "node-taglib2 (native N-API)",
+                    "version": "2.9.6",
+                    "features": { "read": true, "write": true, "artwork": true, "inPlacePadding": true }
+                },
+                "probing": {
+                    "status": "healthy",
+                    "ffprobe": { "available": true, "version": "7.1" },
+                    "mediaInfo": { "available": true, "version": "24.12" }
+                },
+                "conversion": {
+                    "status": "healthy",
+                    "version": "7.1",
+                    "isLgplCompliant": true,
+                    "hasSoxr": true
+                }
+            }
+        }
+    }
+    ```
+
+---
+
+### 2. Audio Metadata APIs
 
 #### `GET /api/media/metadata`
-Inspects unified metadata for a single audio file (merging ExifTool tags, FFprobe technical specs, and artwork presence).
+
+Inspects unified metadata for an audio file (merging TagLib tags, FFprobe technical specs, optional MediaInfo QC, and artwork presence).
 
 - **Query Parameters**:
-  - `path` (string, required): Full filesystem path to the target audio file.
-
-- **Example Request**:
-  ```http
-  GET /api/media/metadata?path=E:/Music/Artist/Album/01-Track.flac HTTP/1.1
-  ```
+    - `path` (string, required): Allowed absolute path to audio file.
+    - `includeQC` (boolean, default: `false`): Include deep MediaInfo QC inspection.
+    - `raw` (boolean, default: `false`): Include raw stream payloads.
 
 - **Example Response (200 OK)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "filePath": "E:/Music/Artist/Album/01-Track.flac",
-      "fileSizeBytes": 45129384,
-      "lastModified": "2026-03-15T14:30:00.000Z",
-      "tags": {
-        "title": "Song Title",
-        "artist": "Artist Name",
-        "album": "Album Title",
-        "genre": ["Alternative", "Rock"],
-        "year": 2024,
-        "trackNumber": 1,
-        "trackTotal": 12
-      },
-      "technical": {
-        "codec": "flac",
-        "codecLongName": "FLAC (Free Lossless Audio Codec)",
-        "containerFormat": "flac",
-        "duration": 245.8,
-        "bitrate": 1411200,
-        "sampleRate": 44100,
-        "channels": 2,
-        "channelLayout": "stereo",
-        "bitsPerSample": 24,
-        "isLossless": true
-      },
-      "artwork": {
-        "cachedPath": "E:/Code/Next/my-music/cache/art/a1b2c3d4e5f6.jpg",
-        "filename": "a1b2c3d4e5f6.jpg",
-        "mimeType": "image/jpeg",
-        "sizeBytes": 124580,
-        "source": "ffmpeg"
-      }
+    ```json
+    {
+        "success": true,
+        "data": {
+            "filePath": "E:/Music/Track.flac",
+            "fileSizeBytes": 45129384,
+            "lastModified": "2026-10-28T01:30:00.000Z",
+            "tags": {
+                "title": "Song Title",
+                "artist": "Artist Name",
+                "album": "Album Title",
+                "genre": ["Alternative", "Rock"],
+                "year": 2024,
+                "trackNumber": 1,
+                "trackTotal": 12
+            },
+            "technical": {
+                "codec": "flac",
+                "codecLongName": "FLAC (Free Lossless Audio Codec)",
+                "containerFormat": "flac",
+                "duration": 245.8,
+                "bitrate": 1411200,
+                "sampleRate": 44100,
+                "channels": 2,
+                "channelLayout": "stereo",
+                "bitsPerSample": 24,
+                "isLossless": true
+            },
+            "artwork": {
+                "cachedPath": "E:/Code/Next/my-music/cache/art/a1b2c3d4e5f6.jpg",
+                "filename": "a1b2c3d4e5f6.jpg",
+                "mimeType": "image/jpeg",
+                "sizeBytes": 124580
+            }
+        }
     }
-  }
-  ```
+    ```
 
----
+#### `POST /api/media/metadata/batch`
 
-#### `POST /api/media/metadata/batch` (or `POST /api/media/metadata`)
-Performs concurrent batch metadata extraction across multiple audio files.
+Extracts metadata concurrently across an array of audio files.
 
 - **Request Body**:
-  ```json
-  {
-    "paths": [
-      "E:/Music/Album/01.mp3",
-      "E:/Music/Album/02.mp3"
-    ]
-  }
-  ```
-
-- **Example Response (200 OK)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "total": 2,
-      "results": {
-        "E:/Music/Album/01.mp3": { /* CombinedAudioMetadata */ },
-        "E:/Music/Album/02.mp3": { /* CombinedAudioMetadata */ }
-      }
-    },
-    "message": "Processed metadata inspection for 2 files"
-  }
-  ```
+    ```json
+    {
+        "paths": ["E:/Music/Song1.flac", "E:/Music/Song2.mp3"]
+    }
+    ```
 
 ---
 
-### 2. Technical Audio Specifications API
+### 3. Audio Tags APIs
 
-#### `GET /api/media/technical`
-Retrieves in-depth stream and container format metrics via FFprobe.
+#### `GET /api/media/tags`
+
+Reads normalized metadata tags for an audio file.
 
 - **Query Parameters**:
-  - `path` (string, required): Full filesystem path to the audio file.
+    - `path` (string, required): Allowed absolute path to audio file.
 
-- **Example Request**:
-  ```http
-  GET /api/media/technical?path=E:/Music/Track.flac HTTP/1.1
-  ```
+#### `PATCH /api/media/tags`
 
-- **Example Response (200 OK)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "codec": "flac",
-      "codecLongName": "FLAC (Free Lossless Audio Codec)",
-      "containerFormat": "flac",
-      "containerLongName": "raw FLAC",
-      "duration": 218.44,
-      "bitrate": 984000,
-      "sampleRate": 48000,
-      "channels": 2,
-      "channelLayout": "stereo",
-      "bitsPerSample": 24,
-      "isLossless": true,
-      "streamCount": 1
-    }
-  }
-  ```
-
----
-
-### 3. Metadata Tag Writing APIs
-
-#### `POST /api/media/tags`
-Writes or modifies metadata tags in a single audio file using persistent ExifTool. Setting a tag to `null` or `""` deletes it.
+Partially updates audio metadata tags using TagLib. Setting a tag to `null` deletes it.
 
 - **Request Body**:
-  ```json
-  {
-    "path": "E:/Music/Track.mp3",
-    "tags": {
-      "Title": "Updated Title",
-      "Artist": "New Artist",
-      "Album": "Special Edition",
-      "Year": 2026,
-      "Genre": ["Electronic", "Ambient"],
-      "Comment": null
-    },
-    "preserveOriginal": false
-  }
-  ```
 
-- **Parameters**:
-  - `path` (string, required): Audio file path.
-  - `tags` (object, required): Key-value pairs of tag names and values (`string`, `number`, `string[]`, or `null`).
-  - `preserveOriginal` (boolean, optional, default: `false`): If `true`, saves the pre-modified file as `filename.ext_original`.
+    ```json
+    {
+        "path": "E:/Music/Track.flac",
+        "tags": {
+            "title": "Updated Song Title",
+            "artist": "Artist Name",
+            "album": "Album Name",
+            "trackNumber": 1,
+            "trackTotal": 10,
+            "year": 2026,
+            "genre": ["Ambient", "Electronic"],
+            "comment": null
+        },
+        "preserveOriginal": false
+    }
+    ```
 
 - **Example Response (200 OK)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "success": true,
-      "filePath": "E:/Music/Track.mp3",
-      "updatedTags": {
-        "Title": "Updated Title",
-        "Artist": "New Artist",
-        "Album": "Special Edition",
-        "Year": 2026,
-        "Genre": ["Electronic", "Ambient"],
-        "Comment": null
-      },
-      "preserveOriginal": false
-    },
-    "message": "Tags written successfully for \"E:/Music/Track.mp3\""
-  }
-  ```
-
----
+    ```json
+    {
+        "success": true,
+        "data": {
+            "filePath": "E:/Music/Track.flac",
+            "updatedTags": {
+                "title": "Updated Song Title",
+                "artist": "Artist Name",
+                "album": "Album Name",
+                "trackNumber": 1,
+                "trackTotal": 10,
+                "year": 2026,
+                "genre": ["Ambient", "Electronic"],
+                "comment": null
+            },
+            "preserveOriginal": false
+        },
+        "message": "Tags updated successfully"
+    }
+    ```
 
 #### `POST /api/media/tags/batch`
-Writes tags to multiple files in a single batch operation.
+
+Batch updates metadata tags across multiple audio files.
 
 - **Request Body**:
-  ```json
-  {
-    "targets": [
-      {
-        "path": "E:/Music/01.mp3",
-        "tags": { "Artist": "Band Name", "Album": "Album Title" }
-      },
-      {
-        "path": "E:/Music/02.mp3",
-        "tags": { "Artist": "Band Name", "Album": "Album Title" }
-      }
-    ],
-    "preserveOriginal": false
-  }
-  ```
-
-- **Example Response (200 OK)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "total": 2,
-      "succeeded": [ /* TagWriteResult[] */ ],
-      "failed": []
-    },
-    "message": "Batch tag write complete: 2 succeeded, 0 failed"
-  }
-  ```
+    ```json
+    {
+        "targets": [
+            {
+                "path": "E:/Music/01.flac",
+                "tags": { "artist": "Band Name", "album": "Album Title" }
+            },
+            {
+                "path": "E:/Music/02.flac",
+                "tags": { "artist": "Band Name", "album": "Album Title" }
+            }
+        ],
+        "preserveOriginal": false
+    }
+    ```
 
 ---
 
-### 4. Album Artwork APIs
+### 4. Technical Audio Specifications
+
+#### `GET /api/media/technical`
+
+Returns stream codec, container specifications, duration, bitrate, sample rate, channels, channel layout, and lossless evaluation via FFprobe and MediaInfo.
+
+- **Query Parameters**:
+    - `path` (string, required): Audio file path.
+    - `includeQC` (boolean, default: `false`): Supplement with MediaInfo metrics.
+
+- **Example Response (200 OK)**:
+    ```json
+    {
+        "success": true,
+        "data": {
+            "codec": "flac",
+            "codecLongName": "FLAC (Free Lossless Audio Codec)",
+            "containerFormat": "flac",
+            "duration": 218.44,
+            "bitrate": 984000,
+            "sampleRate": 48000,
+            "channels": 2,
+            "channelLayout": "stereo",
+            "bitsPerSample": 24,
+            "isLossless": true,
+            "streamCount": 1
+        }
+    }
+    ```
+
+---
+
+### 5. Album Artwork APIs
 
 #### `GET /api/media/artwork`
-Direct binary stream of album artwork for embedding in UI `<img src="/api/media/artwork?file=..." />` elements.
 
-- **Query Parameters** (at least one required):
-  - `file` (string): Cached artwork filename (e.g. `a1b2c3d4e5f6.jpg`). Path traversal is strictly prevented.
-  - `path` (string): Full audio file path. Artwork is extracted on-the-fly and cached if not already present.
+Streams cached album artwork with production caching headers (`Cache-Control: public, max-age=31536000, immutable`).
 
-- **Response Headers**:
-  - `Content-Type`: `image/jpeg` / `image/png` / `image/webp`
-  - `Cache-Control`: `public, max-age=31536000, immutable`
-  - `Content-Disposition`: `inline; filename="<filename>"`
-
-- **Status Codes**:
-  - `200 OK`: Binary image data.
-  - `404 Not Found`: No embedded art available.
-
----
+- **Query Parameters** (one required):
+    - `file` (string): Cached artwork filename (e.g. `a1b2c3d4e5f6.jpg`). Path traversal is strictly prevented.
+    - `path` (string): Audio file path (extracts and caches on-the-fly).
 
 #### `POST /api/media/artwork`
-Extracts embedded artwork from an audio file, persists it into `cache/art`, and returns JSON metadata.
+
+Extracts artwork from an audio file, stores it into `cache/art`, and returns artwork metadata.
 
 - **Request Body**:
-  ```json
-  {
-    "path": "E:/Music/Song.flac",
-    "forceRefresh": false
-  }
-  ```
-
-- **Example Response (200 OK)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "cachedPath": "E:/Code/Next/my-music/cache/art/9c8b7a6f5e4d.jpg",
-      "filename": "9c8b7a6f5e4d.jpg",
-      "mimeType": "image/jpeg",
-      "sizeBytes": 204890,
-      "source": "ffmpeg"
-    },
-    "message": "Artwork extracted successfully"
-  }
-  ```
+    ```json
+    {
+        "path": "E:/Music/Album/Song.flac",
+        "forceRefresh": false
+    }
+    ```
 
 ---
 
-### 5. Library Scanner API
+### 6. Media Conversion & Transcoding
 
-#### `POST /api/scan`
-Initiates a background audio library scan of a directory.
+#### `POST /api/media/convert`
+
+Transcodes an audio file with audiophile-grade SoX resampling, dithering, and format conversion.
 
 - **Request Body**:
-  ```json
-  {
-    "directory": "E:/Music",
-    "scanMode": "addNew",
-    "recursive": true
-  }
-  ```
+    ```json
+    {
+        "inputPath": "E:/Music/Master.wav",
+        "outputPath": "E:/Music/Release.mp3",
+        "targetFormat": "mp3",
+        "bitrate": "320k",
+        "sampleRate": 44100,
+        "resampler": "soxr",
+        "ditherMethod": "triangular",
+        "downmixStereo": true
+    }
+    ```
+- **Example Response (201 Created)**:
+    ```json
+    {
+        "success": true,
+        "data": {
+            "inputPath": "E:/Music/Master.wav",
+            "outputPath": "E:/Music/Release.mp3",
+            "targetFormat": "mp3",
+            "duration": 218.44,
+            "outputSizeBytes": 8740200
+        },
+        "message": "Media converted successfully"
+    }
+    ```
 
-- **Parameters**:
-  - `directory` (string, required): Target folder to scan.
-  - `scanMode` (`"addNew"` | `"forceAll"` | `"rescanErrors"`, default: `"addNew"`).
-  - `recursive` (boolean, default: `true`).
+---
 
+### 7. Library Scanner
+
+#### `POST /api/scan`
+
+Queues a background directory scan for audio files.
+
+- **Request Body**:
+    ```json
+    {
+        "directory": "E:/Music",
+        "scanMode": "addNew",
+        "recursive": true
+    }
+    ```
 - **Example Response (202 Accepted)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "scanId": "scan_1727625000000_abc123",
-      "directory": "E:/Music",
-      "scanMode": "addNew",
-      "recursive": true,
-      "timestamp": "2026-09-29T15:50:00.000Z"
+    ```json
+    {
+        "success": true,
+        "data": {
+            "scanId": "scan_1727625000000_abc123",
+            "directory": "E:/Music",
+            "scanMode": "addNew",
+            "recursive": true,
+            "timestamp": "2026-10-28T02:00:00.000Z"
+        },
+        "message": "Library scan initiated successfully for \"E:/Music\""
+    }
+    ```
+
+---
+
+## Workflow Integration Examples
+
+### Example 1: Ingesting & Probing an Audio Track via cURL
+
+```bash
+curl -X GET "http://localhost:3000/api/media/metadata?path=E:/Music/Artist/Track.flac&includeQC=true" \
+  -H "Accept: application/json"
+```
+
+### Example 2: Updating Tags Losslessly with cURL
+
+```bash
+curl -X PATCH "http://localhost:3000/api/media/tags" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "E:/Music/Artist/Track.flac",
+    "tags": {
+      "title": "Midnight Odyssey",
+      "artists": ["Kavinsky", "Lovefoxxx"],
+      "album": "Nightcall EP",
+      "year": 2024,
+      "genre": ["Synthwave", "Electronic"],
+      "customTags": {
+        "catalognumber": "REC-0012"
+      }
     },
-    "message": "Library scan initiated successfully for \"E:/Music\""
-  }
-  ```
+    "preserveOriginal": false
+  }'
+```
+
+### Example 3: Transcoding Master WAV to 320k MP3 with SoX Resampling
+
+```bash
+curl -X POST "http://localhost:3000/api/media/convert" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputPath": "E:/Music/Master/Track_96k24b.wav",
+    "outputPath": "E:/Music/Release/Track_44k16b.mp3",
+    "targetFormat": "mp3",
+    "bitrate": "320k",
+    "sampleRate": 44100,
+    "resampler": "soxr",
+    "ditherMethod": "triangular",
+    "downmixStereo": true
+  }'
+```
 
 ---
 
 ## Bruno API Collection
 
-The repository includes a complete [Bruno](https://www.usebruno.com/) API collection located under [`bruno/`](file:///e:/Code/Next/my-music/bruno/) containing 29 requests covering every endpoint with happy paths, validation errors, and assertions.
+The repository includes a complete [Bruno](https://www.usebruno.com/) collection under [`bruno/`](file:///e:/Code/Next/my-music/bruno/) containing 29 test requests covering:
 
-### Opening the Collection in Bruno:
-1. Open the **Bruno** desktop application.
-2. Click **Open Collection** and select the [`bruno/`](file:///e:/Code/Next/my-music/bruno/) folder in this repository.
-3. Select the **Local** environment (`{{baseUrl}} = http://localhost:3000`).
-4. Execute individual requests or run the entire test suite.
+- **Health**: Liveness, readiness, and media engine diagnostics
+- **Metadata**: Single and batch inspection
+- **Tags**: Reading, single PATCH updates, and batch updates
+- **Conversion**: FLAC, MP3 with SoX dithering, Opus, and validation failure tests
+- **Artwork**: Extraction and binary streaming
+- **Technical Info**: Deep stream probing
+- **Library Scan**: Background scan queuing
+
+### Running Bruno Tests:
+
+1. Open the **Bruno** desktop app.
+2. Select **Open Collection** and choose the `bruno/` directory.
+3. Select the `Local` environment (`{{baseUrl}} = http://localhost:3000`).
+4. Run individual requests or execute the full test runner.
 
 ---
 
 ## Development Scripts
 
 ```bash
-# Run Next.js local development server (with Turbopack)
+# Start local development server with Turbopack
 npm run dev
 
-# Run production build and verify TypeScript types
+# Run TypeScript compilation and build production bundle
 npm run build
 
 # Run ESLint validation

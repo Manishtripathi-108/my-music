@@ -7,11 +7,12 @@ import 'server-only';
 import { applyCoverArt, applyTags, clearPictures, readMetadata, readPictures } from 'taglib-wasm/simple';
 
 import { serverEnv } from '@/config/env.server';
+import type { AudioTags, WriteAudioTags } from '@/lib/media';
 
 import { type ToolHealth, evaluateToolHealth } from '../tool-inspector';
 import type { RawPictureData, TagWriteOptions, TagWriteResult } from '../types';
+import { NodeTagLib2Adapter } from './node-taglib2.adapter';
 import { TagMapper } from './tag-mapper';
-import type { AudioTags, WriteAudioTags } from '@/lib/media';
 
 const execFileAsync = promisify(execFile);
 
@@ -85,11 +86,32 @@ function safeParseWorkerJson<T = unknown>(raw: string): T {
  * Guarantees zero audio re-encoding, padding preservation, and atomic crash-safe writes.
  */
 export class TagLibAdapter {
+    private readonly nodeTaglib2 = new NodeTagLib2Adapter();
+
     /**
      * Returns health diagnostics for this adapter: configured vs active engine
      * and both native/WASM implementation statuses.
      */
     public static async getToolHealth(): Promise<ToolHealth> {
+        if (NodeTagLib2Adapter.isAvailable()) {
+            const version = NodeTagLib2Adapter.getVersion();
+            const configured = serverEnv.METADATA_ENGINE;
+            const active = configured === 'native' ? 'native' : 'wasm';
+            return {
+                configured,
+                active,
+                implementations: {
+                    native: {
+                        available: true,
+                        version,
+                        path: 'node-taglib2',
+                    },
+                    wasm: { available: true },
+                },
+                status: configured === active ? 'healthy' : 'degraded',
+            };
+        }
+
         const workerPath = resolveWorkerPath(serverEnv.TAGLIB_WORKER_PATH);
         return evaluateToolHealth('taglib', workerPath, ['--version'], parseTagLibVersion, serverEnv.METADATA_ENGINE);
     }
@@ -98,10 +120,11 @@ export class TagLibAdapter {
      * Reads all normalized tags and embedded cover art from an audio file.
      *
      * What is happening:
-     * 1. Attempts to read metadata via TagLib native worker sidecar if configured and available.
-     * 2. Falls back to in-process WebAssembly (`taglib-wasm`), reading the file buffer into memory.
-     * 3. Extracts raw properties and cover pictures (prioritizing FrontCover).
-     * 4. Translates raw TagLib properties into the normalized AudioTags domain model via TagMapper.
+     * 1. Attempts to read metadata via voltraco/node-taglib2 in-process native binding if available.
+     * 2. Attempts to read metadata via TagLib native worker sidecar if configured and available.
+     * 3. Falls back to in-process WebAssembly (`taglib-wasm`), reading the file buffer into memory.
+     * 4. Extracts raw properties and cover pictures (prioritizing FrontCover).
+     * 5. Translates raw TagLib properties into the normalized AudioTags domain model via TagMapper.
      *
      * @param canonicalPath - Pre-authorized canonical absolute file path.
      * @returns Fully normalized AudioTags, raw properties dictionary, and primary artwork picture.
@@ -112,6 +135,18 @@ export class TagLibAdapter {
         artwork: RawPictureData | null;
     }> {
         const configured = serverEnv.METADATA_ENGINE;
+
+        if (configured === 'native' && NodeTagLib2Adapter.isAvailable()) {
+            try {
+                return this.nodeTaglib2.readTags(canonicalPath);
+            } catch (error) {
+                console.warn(
+                    '[TagLibAdapter] node-taglib2 failed to read tags, falling back to worker/WASM:',
+                    error instanceof Error ? error.message : error
+                );
+            }
+        }
+
         const workerPath = resolveWorkerPath(serverEnv.TAGLIB_WORKER_PATH);
         const useNative = configured === 'native' && Boolean(workerPath);
 
@@ -157,9 +192,18 @@ export class TagLibAdapter {
     }
 
     /**
-     * Extracts embedded artwork from an audio file via TagLib WASM.
+     * Extracts embedded artwork from an audio file via TagLib WASM or node-taglib2.
      */
     public async readArtwork(canonicalPath: string): Promise<RawPictureData | null> {
+        if (serverEnv.METADATA_ENGINE === 'native' && NodeTagLib2Adapter.isAvailable()) {
+            try {
+                const artwork = this.nodeTaglib2.readArtwork(canonicalPath);
+                if (artwork) return artwork;
+            } catch {
+                // fall through to WASM
+            }
+        }
+
         try {
             const fileBuffer = await fs.promises.readFile(canonicalPath);
             const pictures = await readPictures(fileBuffer);
@@ -181,8 +225,8 @@ export class TagLibAdapter {
      *
      * What is happening:
      * 1. Creates a hardlink or copy backup (`<file>_original`) if `options.preserveOriginal` is true.
-     * 2. Computes the deterministic TagLibWritePlan and flat property map via TagMapper.
-     * 3. Erases removed properties (`[]`) and updates set properties using TagLib in-place padding writes.
+     * 2. Attempts atomic write via voltraco/node-taglib2 in-process native binding if available.
+     * 3. Falls back to TagLib WASM in-place padding writes.
      * 4. Writes the updated buffer to a temporary sibling file (`.<file>.tmp_<uuid>`), flushes with fsync,
      *    restores atime/mtime timestamps, and atomically renames over the destination path.
      *
@@ -190,28 +234,22 @@ export class TagLibAdapter {
      * @param tags - Validated canonical WriteAudioTags model.
      * @param options - Tag write options (e.g. backup preservation).
      * @returns Result indicating final file path and optional backup path.
-     *
-     * @example
-     * // Input path and write patch:
-     * const patch = {
-     *     title: 'Kashmir (2015 Remaster)',
-     *     rating: 95,
-     *     lyrics: null, // delete lyrics
-     * };
-     * const result = await adapter.writeTags(
-     *     '/music/led_zeppelin/kashmir.flac',
-     *     patch,
-     *     { preserveOriginal: true }
-     * );
-     *
-     * // Desired Result:
-     * // {
-     * //     filePath: '/music/led_zeppelin/kashmir.flac',
-     * //     backupPath: '/music/led_zeppelin/kashmir.flac_original',
-     * // }
      */
     public async writeTags(canonicalPath: string, tags: WriteAudioTags, options: TagWriteOptions = {}): Promise<TagWriteResult> {
         const backupPath = await this.createBackupIfNeeded(canonicalPath, options.preserveOriginal);
+
+        if (serverEnv.METADATA_ENGINE === 'native' && NodeTagLib2Adapter.isAvailable()) {
+            try {
+                await this.nodeTaglib2.writeTags(canonicalPath, tags);
+                const { tags: updatedTags } = await this.readTags(canonicalPath);
+                return { filePath: canonicalPath, backupPath, tags: updatedTags };
+            } catch (error) {
+                console.warn(
+                    '[TagLibAdapter] node-taglib2 failed to write tags, falling back to WASM:',
+                    error instanceof Error ? error.message : error
+                );
+            }
+        }
 
         const fileBuffer = await fs.promises.readFile(canonicalPath);
         const plan = TagMapper.toTagLibProperties(tags);
@@ -237,6 +275,19 @@ export class TagLibAdapter {
     ): Promise<TagWriteResult> {
         const backupPath = await this.createBackupIfNeeded(canonicalPath, options.preserveOriginal);
 
+        if (serverEnv.METADATA_ENGINE === 'native' && NodeTagLib2Adapter.isAvailable()) {
+            try {
+                await this.nodeTaglib2.embedArtwork(canonicalPath, imageBuffer, mimeType);
+                const { tags: updatedTags } = await this.readTags(canonicalPath);
+                return { filePath: canonicalPath, backupPath, tags: updatedTags };
+            } catch (error) {
+                console.warn(
+                    '[TagLibAdapter] node-taglib2 failed to embed artwork, falling back to WASM:',
+                    error instanceof Error ? error.message : error
+                );
+            }
+        }
+
         const fileBuffer = await fs.promises.readFile(canonicalPath);
         const updatedBuffer = await applyCoverArt(fileBuffer, imageBuffer, mimeType);
         await this.atomicWriteFile(canonicalPath, Buffer.from(updatedBuffer));
@@ -250,6 +301,19 @@ export class TagLibAdapter {
      */
     public async removeArtwork(canonicalPath: string, options: TagWriteOptions = {}): Promise<TagWriteResult> {
         const backupPath = await this.createBackupIfNeeded(canonicalPath, options.preserveOriginal);
+
+        if (serverEnv.METADATA_ENGINE === 'native' && NodeTagLib2Adapter.isAvailable()) {
+            try {
+                await this.nodeTaglib2.removeArtwork(canonicalPath);
+                const { tags: updatedTags } = await this.readTags(canonicalPath);
+                return { filePath: canonicalPath, backupPath, tags: updatedTags };
+            } catch (error) {
+                console.warn(
+                    '[TagLibAdapter] node-taglib2 failed to remove artwork, falling back to WASM:',
+                    error instanceof Error ? error.message : error
+                );
+            }
+        }
 
         const fileBuffer = await fs.promises.readFile(canonicalPath);
         const updatedBuffer = await clearPictures(fileBuffer);

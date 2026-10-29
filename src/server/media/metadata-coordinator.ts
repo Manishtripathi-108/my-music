@@ -68,8 +68,7 @@ export class MetadataCoordinator {
     /* -------------------------- Single Read Operation ------------------------- */
 
     /**
-     * Reads unified metadata for a single audio file.
-     * Throws on failure.
+     * Reads unified metadata for a single audio file in a single I/O pass.
      */
     public async read(filePath: string, options: ReadAudioOptions = {}): Promise<CombinedAudioMetadata> {
         const canonicalPath = await authorizeInputPath(filePath);
@@ -79,15 +78,25 @@ export class MetadataCoordinator {
         const forceArtworkRefresh = options.forceArtworkRefresh ?? false;
         const includeQC = options.includeQC ?? false;
 
-        const [tagResult, technical, qc, artwork] = await Promise.all([
+        // Run TagLib, FFprobe, and optional MediaInfo in parallel
+        const [tagResult, technical, qc] = await Promise.all([
             this.taglib.readTags(canonicalPath),
             this.ffprobe.inspect(canonicalPath),
             includeQC ? this.mediaInfo.inspect(canonicalPath).catch(() => null) : Promise.resolve(null),
-            includeArtwork ? this.extractArtwork(canonicalPath, forceArtworkRefresh).catch(() => null) : Promise.resolve(null),
         ]);
 
         if (technical.channels === 0 && technical.sampleRate === 0 && technical.duration === 0) {
             throw new BadRequestError(`File "${path.basename(canonicalPath)}" is corrupt or contains no valid audio stream`);
+        }
+
+        // Reuse the artwork buffer already parsed by taglib.readTags() instead of re-reading from disk
+        let artwork: ExtractedArtwork | null = null;
+        if (includeArtwork) {
+            if (tagResult.artwork?.data) {
+                artwork = await this.saveOrGetCachedArtwork(canonicalPath, stats, tagResult.artwork.data, forceArtworkRefresh);
+            } else {
+                artwork = await this.findCachedArtworkForFile(canonicalPath, stats);
+            }
         }
 
         return {
@@ -108,7 +117,6 @@ export class MetadataCoordinator {
 
     /**
      * Reads metadata for multiple pre-authorized files with bounded concurrency.
-     * Catches individual file errors so one failing file does not abort the queue.
      */
     public async readBatch(canonicalPaths: string[], options: ReadAudioOptions = {}, concurrency = 8): Promise<Map<string, CombinedAudioMetadata>> {
         const results = new Map<string, CombinedAudioMetadata>();
@@ -116,11 +124,10 @@ export class MetadataCoordinator {
             return results;
         }
 
-        const queue = [...canonicalPaths];
-
+        let currentIndex = 0;
         const worker = async () => {
-            while (queue.length > 0) {
-                const nextPath = queue.shift();
+            while (currentIndex < canonicalPaths.length) {
+                const nextPath = canonicalPaths[currentIndex++];
                 if (!nextPath) break;
 
                 try {
@@ -132,8 +139,8 @@ export class MetadataCoordinator {
             }
         };
 
-        const workers = Array.from({ length: Math.min(concurrency, canonicalPaths.length) }, () => worker());
-        await Promise.all(workers);
+        const workerCount = Math.min(concurrency, canonicalPaths.length);
+        await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
         return results;
     }
@@ -142,11 +149,16 @@ export class MetadataCoordinator {
 
     /**
      * Updates metadata tags on a single audio file and invalidates its artwork cache.
-     * Throws on failure.
      */
     public async writeTags(filePath: string, tags: WriteAudioTags, options: TagWriteOptions = {}): Promise<TagWriteResult> {
         const canonicalPath = await authorizeInputPath(filePath);
+        const preStats = await fs.promises.stat(canonicalPath).catch(() => null);
+
         const result = await this.taglib.writeTags(canonicalPath, tags, options);
+
+        if (preStats) {
+            await this.purgeCacheKey(canonicalPath, preStats.size, preStats.mtimeMs);
+        }
         await this.invalidateArtworkCache(canonicalPath);
         return result;
     }
@@ -154,7 +166,7 @@ export class MetadataCoordinator {
     /* -------------------------- Batch Write Operation ------------------------- */
 
     /**
-     * Updates tags across multiple files. Catches individual item errors to populate failed[].
+     * Updates tags across multiple files.
      */
     public async writeTagsBatch(targets: Array<{ path: string; tags: WriteAudioTags }>, options: TagWriteOptions = {}): Promise<BatchTagWriteResult> {
         const succeeded: TagWriteResult[] = [];
@@ -226,49 +238,64 @@ export class MetadataCoordinator {
 
     private async executeExtractArtwork(canonicalPath: string, forceRefresh: boolean): Promise<ExtractedArtwork | null> {
         const stats = await fs.promises.stat(canonicalPath);
-        const cacheKey = this.computeCacheKey(canonicalPath, stats.size, stats.mtimeMs);
-
-        await fs.promises.mkdir(this.cacheDir, { recursive: true });
-
-        const cachedJpg = path.join(this.cacheDir, `${cacheKey}.jpg`);
-        const cachedPng = path.join(this.cacheDir, `${cacheKey}.png`);
 
         if (!forceRefresh) {
-            for (const candidate of [cachedJpg, cachedPng]) {
-                try {
-                    const cStats = await fs.promises.stat(/*turbopackIgnore: true*/ candidate);
-                    if (cStats.size > 100) {
-                        const buffer = await fs.promises.readFile(/*turbopackIgnore: true*/ candidate);
-                        return await this.buildExtractedArtwork(candidate, buffer);
-                    }
-                } catch {
-                    // Try next candidate
-                }
-            }
+            const existing = await this.findCachedArtworkForFile(canonicalPath, stats);
+            if (existing) return existing;
         }
 
         const tagResult = await this.taglib.readTags(canonicalPath);
-        let artworkData = tagResult.artwork;
-        if (!artworkData?.data || artworkData.data.length === 0) {
-            artworkData = await this.taglib.readArtwork(canonicalPath);
-        }
-
-        if (!artworkData || !artworkData.data || artworkData.data.length === 0) {
+        if (!tagResult.artwork?.data || tagResult.artwork.data.length === 0) {
             return null;
         }
 
-        const { mimeType } = await getImageMetadata(artworkData.data);
-        const ext = mimeType === 'image/png' ? 'png' : 'jpg';
-        const destination = path.join(/*turbopackIgnore: true*/ this.cacheDir, `${cacheKey}.${ext}`);
-
-        await fs.promises.writeFile(/*turbopackIgnore: true*/ destination, artworkData.data);
-
-        return this.buildExtractedArtwork(destination, artworkData.data);
+        return this.saveOrGetCachedArtwork(canonicalPath, stats, tagResult.artwork.data, forceRefresh);
     }
 
-    /**
-     * Constructs a normalized ExtractedArtwork descriptor from a cached image buffer.
-     */
+    private async findCachedArtworkForFile(canonicalPath: string, stats: fs.Stats): Promise<ExtractedArtwork | null> {
+        const cacheKey = this.computeCacheKey(canonicalPath, stats.size, stats.mtimeMs);
+        for (const ext of ['jpg', 'png', 'webp']) {
+            const candidate = path.join(/*turbopackIgnore: true*/ this.cacheDir, `${cacheKey}.${ext}`);
+            try {
+                const cStats = await fs.promises.stat(/*turbopackIgnore: true*/ candidate);
+                if (cStats.size > 100) {
+                    const buffer = await fs.promises.readFile(/*turbopackIgnore: true*/ candidate);
+                    return await this.buildExtractedArtwork(candidate, buffer);
+                }
+            } catch {
+                // Check next extension candidate
+            }
+        }
+        return null;
+    }
+
+    private async saveOrGetCachedArtwork(
+        canonicalPath: string,
+        stats: fs.Stats,
+        artworkBuffer: Buffer,
+        forceRefresh = false
+    ): Promise<ExtractedArtwork> {
+        const cacheKey = this.computeCacheKey(canonicalPath, stats.size, stats.mtimeMs);
+        await fs.promises.mkdir(/*turbopackIgnore: true*/ this.cacheDir, { recursive: true });
+
+        const { width, height, mimeType } = await getImageMetadata(artworkBuffer);
+        const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+        const destination = path.join(/*turbopackIgnore: true*/ this.cacheDir, `${cacheKey}.${ext}`);
+
+        if (forceRefresh || !(await fs.promises.stat(/*turbopackIgnore: true*/ destination).catch(() => null))) {
+            await fs.promises.writeFile(/*turbopackIgnore: true*/ destination, artworkBuffer);
+        }
+
+        return {
+            cachedPath: destination,
+            filename: `${cacheKey}.${ext}`,
+            mimeType,
+            sizeBytes: artworkBuffer.length,
+            width,
+            height,
+        };
+    }
+
     private async buildExtractedArtwork(cachedPath: string, buffer: Buffer): Promise<ExtractedArtwork> {
         const { width, height, mimeType } = await getImageMetadata(buffer);
         return {
@@ -286,8 +313,14 @@ export class MetadataCoordinator {
      */
     public async embedArtwork(filePath: string, imageBuffer: Buffer, options: TagWriteOptions = {}): Promise<TagWriteResult> {
         const canonicalPath = await authorizeInputPath(filePath);
+        const preStats = await fs.promises.stat(canonicalPath).catch(() => null);
+
         const { mimeType } = await getImageMetadata(imageBuffer);
         const result = await this.taglib.embedArtwork(canonicalPath, imageBuffer, mimeType, options);
+
+        if (preStats) {
+            await this.purgeCacheKey(canonicalPath, preStats.size, preStats.mtimeMs);
+        }
         await this.invalidateArtworkCache(canonicalPath);
         return result;
     }
@@ -297,7 +330,13 @@ export class MetadataCoordinator {
      */
     public async removeArtwork(filePath: string, options: TagWriteOptions = {}): Promise<TagWriteResult> {
         const canonicalPath = await authorizeInputPath(filePath);
+        const preStats = await fs.promises.stat(canonicalPath).catch(() => null);
+
         const result = await this.taglib.removeArtwork(canonicalPath, options);
+
+        if (preStats) {
+            await this.purgeCacheKey(canonicalPath, preStats.size, preStats.mtimeMs);
+        }
         await this.invalidateArtworkCache(canonicalPath);
         return result;
     }
@@ -308,11 +347,16 @@ export class MetadataCoordinator {
     public async invalidateArtworkCache(canonicalPath: string): Promise<void> {
         try {
             const stats = await fs.promises.stat(canonicalPath);
-            const key = this.computeCacheKey(canonicalPath, stats.size, stats.mtimeMs);
-            await fs.promises.unlink(path.join(this.cacheDir, `${key}.jpg`)).catch(() => {});
-            await fs.promises.unlink(path.join(this.cacheDir, `${key}.png`)).catch(() => {});
+            await this.purgeCacheKey(canonicalPath, stats.size, stats.mtimeMs);
         } catch {
             // Ignore if file deleted or moved
+        }
+    }
+
+    private async purgeCacheKey(canonicalPath: string, size: number, mtimeMs: number): Promise<void> {
+        const key = this.computeCacheKey(canonicalPath, size, mtimeMs);
+        for (const ext of ['jpg', 'png', 'webp']) {
+            await fs.promises.unlink(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ this.cacheDir, `${key}.${ext}`)).catch(() => {});
         }
     }
 
@@ -326,7 +370,4 @@ export class MetadataCoordinator {
     }
 }
 
-/**
- * Singleton instance of MetadataCoordinator owning shared in-flight deduplication state.
- */
 export const metadataCoordinator = new MetadataCoordinator();

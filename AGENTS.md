@@ -296,7 +296,6 @@ The media subsystem is three decoupled engines. Native binaries are the default;
 ### Artwork
 
 - Extraction and embedding go through the Metadata Engine (TagLib 2.x, ID3v2 `APIC` types `$03` front and `$04` back, FLAC `METADATA_BLOCK_PICTURE`, MP4 `covr`), with zero container remuxing.
-- Validate buffers by magic bytes. Dimensions and MIME types are parsed via zero-dependency pure buffer inspection (JPEG SOF0/SOF2 and PNG IHDR headers). Do not introduce Sharp or external image processing libraries.
 - Cache at `cache/art/<key>.<ext>` with `key = sha256(filePath + ":" + size + ":" + mtimeMs).slice(0, 24)`.
 - **Invalidate a file's cache entry on every tag write.** Padded in-place writes keep `size`, and restored timestamps keep `mtime`, so the key alone will not change.
 

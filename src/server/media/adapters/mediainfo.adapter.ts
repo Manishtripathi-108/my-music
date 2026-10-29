@@ -1,3 +1,4 @@
+import type { MediaInfo } from 'mediainfo.js';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import { promisify } from 'node:util';
@@ -16,10 +17,22 @@ function parseMediaInfoVersion(output: string): string | null {
     return output.match(/MediaInfoLib\s*-\s*v?([^\s\r\n]+)/i)?.[1] ?? output.match(/\bv?(\d+\.\d+(?:\.\d+)?)\b/)?.[1] ?? null;
 }
 
+// Module-level pooled WASM factory promise
+let wasmInstancePromise: Promise<MediaInfo<'object'>> | null = null;
+
+async function getWasmMediaInfoInstance() {
+    if (!wasmInstancePromise) {
+        wasmInstancePromise = (async () => {
+            const { default: mediaInfoFactory } = await import('mediainfo.js');
+            return mediaInfoFactory({ format: 'object' });
+        })();
+    }
+    return wasmInstancePromise;
+}
+
 /**
  * MediaInfo Forensic Quality-Control Adapter.
- * Runs native MediaInfo CLI as primary engine, falling back to mediainfo.js (WASM).
- * Extracts deep forensics (true bit depth, CBR vs VBR, encoder library, gapless delay/padding).
+ * Supports native MediaInfo CLI with high-performance WASM fallback.
  */
 export class MediaInfoAdapter {
     private readonly binaryPath: string;
@@ -28,18 +41,10 @@ export class MediaInfoAdapter {
         this.binaryPath = binaryPath;
     }
 
-    /**
-     * Returns health diagnostics for this adapter.
-     */
     public static async getToolHealth(): Promise<ToolHealth> {
         return evaluateToolHealth('mediaInfo', serverEnv.MEDIAINFO_PATH, ['--version'], parseMediaInfoVersion, serverEnv.PROBING_ENGINE);
     }
 
-    /**
-     * Inspects an audio file and returns forensic quality-control metrics.
-     *
-     * @param canonicalPath - Pre-authorized canonical absolute file path.
-     */
     public async inspect(canonicalPath: string): Promise<MediaInfoQC> {
         const configured = serverEnv.PROBING_ENGINE;
 
@@ -69,9 +74,7 @@ export class MediaInfoAdapter {
     }
 
     private async inspectWasm(canonicalPath: string): Promise<MediaInfoQC> {
-        const { default: mediaInfoFactory } = await import('mediainfo.js');
-        const mediaInfo = await mediaInfoFactory({ format: 'object' });
-
+        const mediaInfo = await getWasmMediaInfoInstance();
         const fileHandle = await fs.promises.open(canonicalPath, 'r');
         const fileStats = await fileHandle.stat();
 
@@ -86,7 +89,6 @@ export class MediaInfoAdapter {
             return this.normalizeResult(result);
         } finally {
             await fileHandle.close();
-            mediaInfo.close();
         }
     }
 

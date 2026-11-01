@@ -1,6 +1,6 @@
 import type { NextResponse } from 'next/server';
 
-import { scanRequestSchema, type ScanResponseData } from '@/features/scanner';
+import { type ScanResponseData, scanRequestSchema } from '@/features/scanner';
 import { apiAccepted, handleRouteError } from '@/server/api';
 import type { ApiResponse } from '@/types/api';
 

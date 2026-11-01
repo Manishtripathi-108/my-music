@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 import { Geist, Geist_Mono } from 'next/font/google';
 
@@ -21,6 +21,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
     title: 'My Music',
     description: 'Listen and stream your favorite music',
+};
+
+export const viewport: Viewport = {
+    themeColor: [
+        { media: '(prefers-color-scheme: light)', color: '#f2f3f5' },
+        { media: '(prefers-color-scheme: dark)', color: '#090a0f' },
+    ],
 };
 
 const RootLayout = ({ children }: { children: React.ReactNode }) => {

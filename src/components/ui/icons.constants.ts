@@ -3,6 +3,7 @@ enum IconSet {
     sun = 'solar:sun-bold',
     moon = 'solar:moon-stars-bold',
     desktop = 'solar:monitor-bold',
+    palette = 'solar:palette-round-bold',
 
     /* -------------------------- Shapes (Transition) --------------------------- */
     shapeCircle = 'solar:record-bold',
@@ -33,6 +34,7 @@ enum IconSet {
     volumeLow = 'solar:volume-small-bold',
 
     /* ------------------------- Navigation & Controls -------------------------- */
+    home = 'solar:home-2-bold',
     close = 'solar:close-bold',
     closeCircle = 'solar:close-circle-bold',
     check = 'solar:check-bold',
@@ -71,6 +73,12 @@ enum IconSet {
     folderWithFiles = 'solar:folder-with-files-bold',
     file = 'solar:file-bold',
     fileText = 'solar:file-text-bold',
+
+    /* ----------------------------- Technical / Lab ---------------------------- */
+    shuffle = 'solar:shuffle-bold',
+    code = 'solar:code-bold',
+    arrowUpRight = 'solar:arrow-right-up-bold',
+    sparkle = 'solar:star-fall-bold',
 }
 
 export default IconSet;

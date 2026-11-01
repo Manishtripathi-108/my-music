@@ -17,8 +17,8 @@ import { RadioGroup, RadioGroupItem, RadioGroupItemControl, RadioGroupItemText, 
 import cn from '@/lib/cn';
 import type { ApiError, ApiErrorDetail, ApiFieldError, ApiSuccess } from '@/types/api';
 
-import { type ScanMode, type ScanRequestInput, scanRequestSchema } from '../schemas/scan-request.schema';
 import { useScanModalStore } from '../hooks/use-scan-modal-store';
+import { type ScanMode, type ScanRequestInput, scanRequestSchema } from '../schemas/scan-request.schema';
 import type { ScanResponseData } from '../types';
 
 export interface ScanModalProps {
@@ -168,16 +168,18 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
 
     return (
         <Dialog open={isModalOpen} onOpenChange={(details) => setModalOpen(details.open)}>
-            <DialogContent className="max-w-xl">
+            <DialogContent className="max-w-xl font-mono text-xs shadow-2xl">
                 <DialogCloseTrigger />
 
                 <div className="flex items-center gap-3">
-                    <div className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-2xl shadow-xs">
-                        <Icon icon="refresh" className="size-6" />
+                    <div className="bg-card text-card-foreground text-foreground flex size-11 items-center justify-center rounded-xl shadow-sm">
+                        <Icon icon="refresh" className="size-5.5" />
                     </div>
                     <div>
-                        <DialogTitle>Scan Music Library</DialogTitle>
-                        <DialogDescription>Configure local directory indexation, metadata extraction, and audio cataloging.</DialogDescription>
+                        <DialogTitle className="font-mono text-base font-bold">Scan Music Library</DialogTitle>
+                        <DialogDescription className="text-muted-foreground font-mono text-xs">
+                            Configure local directory indexation, metadata extraction, and audio cataloging.
+                        </DialogDescription>
                     </div>
                 </div>
 
@@ -186,7 +188,7 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
                     {rootServerErrorMessage && (
                         <div
                             role="alert"
-                            className="bg-destructive/10 border-destructive/25 text-destructive motion-preset-fade motion-duration-200 flex items-start gap-2.5 rounded-xl border p-3 text-xs font-medium">
+                            className="bg-destructive/10 text-destructive motion-preset-fade motion-duration-200 flex items-start gap-2.5 rounded-xl p-3 text-xs font-medium shadow-xs">
                             <Icon icon="alert" className="mt-0.5 size-4 shrink-0" />
                             <div className="flex-1 leading-relaxed">{rootServerErrorMessage}</div>
                         </div>
@@ -198,7 +200,11 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
                             <div className="text-muted-foreground pointer-events-none absolute left-3 flex items-center justify-center">
                                 <Icon icon="folder" className="size-4" />
                             </div>
-                            <FieldInput {...register('directory')} placeholder="e.g. D:/Music or /home/user/music" className="pl-10" />
+                            <FieldInput
+                                {...register('directory')}
+                                placeholder="e.g. D:/Music or /home/user/music"
+                                className="pl-10 font-mono text-xs"
+                            />
                         </div>
                         <FieldErrorText>{errors.directory?.message}</FieldErrorText>
                         <FieldHelperText>Absolute path to audio folder on your system</FieldHelperText>
@@ -218,16 +224,21 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
                                                 key={item.value}
                                                 value={item.value}
                                                 cardStyle
-                                                className="hover:border-primary/50 transition-colors">
+                                                className={cn(
+                                                    'bg-card text-card-foreground cursor-pointer rounded-xl shadow-sm transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:shadow-md hover:brightness-[1.02] active:scale-[0.99] active:shadow-inner active:inset-shadow-xs',
+                                                    item.value === field.value && 'ring-primary/40 ring-1'
+                                                )}>
                                                 <RadioGroupItemControl />
                                                 <div className="flex flex-1 flex-col">
                                                     <div className="flex items-center justify-between">
-                                                        <RadioGroupItemText className="font-semibold">{item.label}</RadioGroupItemText>
+                                                        <RadioGroupItemText className="text-xs font-semibold">{item.label}</RadioGroupItemText>
                                                         <Badge size="xs" variant={item.value === field.value ? 'solid' : 'outline'}>
                                                             {item.badge}
                                                         </Badge>
                                                     </div>
-                                                    <span className="text-muted-foreground mt-0.5 text-xs leading-relaxed">{item.description}</span>
+                                                    <span className="text-muted-foreground mt-0.5 text-[11px] leading-relaxed">
+                                                        {item.description}
+                                                    </span>
                                                 </div>
                                             </RadioGroupItem>
                                         ))}
@@ -238,7 +249,7 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
                         <FieldErrorText>{errors.scanMode?.message}</FieldErrorText>
                     </Field>
 
-                    <hr />
+                    <div className="bg-muted/60 my-1 h-px" />
 
                     {/* Recursive Scan Toggle using Ark UI Checkbox */}
                     <Field invalid={Boolean(errors.recursive)}>
@@ -246,16 +257,16 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
                             defaultChecked
                             disabled={isSubmitting}
                             className={cn(
-                                'hover:border-primary/50 flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-all',
-                                errors.recursive && 'border-destructive/60 bg-destructive/5',
-                                recursiveValue ? 'border-primary/40 bg-primary/5' : 'bg-card'
+                                'bg-card text-card-foreground flex cursor-pointer items-center justify-between rounded-xl p-4 shadow-sm transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:shadow-md hover:brightness-[1.02] active:scale-[0.99] active:shadow-inner active:inset-shadow-xs',
+                                errors.recursive && 'bg-destructive/5 ring-destructive/40 ring-1',
+                                recursiveValue && 'ring-primary/40 ring-1'
                             )}>
                             <CheckboxHiddenInput {...register('recursive')} />
                             <div className="flex items-center gap-3">
                                 <CheckboxControl />
                                 <div>
-                                    <CheckboxLabel>Scan Recursively</CheckboxLabel>
-                                    <p className="text-muted-foreground text-xs">Search through subdirectories and nested album folders</p>
+                                    <CheckboxLabel className="text-xs font-semibold">Scan Recursively</CheckboxLabel>
+                                    <p className="text-muted-foreground text-[11px]">Search through subdirectories and nested album folders</p>
                                 </div>
                             </div>
                         </CheckboxRoot>
@@ -263,13 +274,13 @@ export function ScanModal({ onScanSuccess }: ScanModalProps = {}) {
                     </Field>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end gap-3">
+                    <div className="flex items-center justify-end gap-3 pt-2">
                         <Button type="button" variant="ghost" size="sm" disabled={isSubmitting} onClick={() => closeModal()}>
                             Cancel
                         </Button>
-                        <Button type="submit" size="sm" disabled={isSubmitting}>
+                        <Button type="submit" variant="primary" size="md" disabled={isSubmitting}>
                             <Icon icon={isSubmitting ? 'loading' : 'play'} className="size-4" />
-                            {isSubmitting ? 'Starting Scan...' : 'Start Library Scan'}
+                            {isSubmitting ? 'Starting Scan...' : 'START LIBRARY SCAN'}
                         </Button>
                     </div>
                 </form>

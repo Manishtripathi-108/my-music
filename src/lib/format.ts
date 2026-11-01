@@ -494,10 +494,7 @@ export function convertDate(value: string | Date | number): DateParts | null {
  * splitDelimitedList(['Rock, Pop', 'Jazz, Rock']); // ['Rock', 'Pop', 'Jazz']
  * splitDelimitedList('path1;path2', /[;,]/); // ['path1', 'path2']
  */
-export function splitDelimitedList(
-    input: string | readonly string[] | null | undefined,
-    delimiter: string | RegExp = ','
-): string[] {
+export function splitDelimitedList(input: string | readonly string[] | null | undefined, delimiter: string | RegExp = ','): string[] {
     if (!input) return [];
 
     const items = Array.isArray(input) ? input : [input];
@@ -516,4 +513,3 @@ export function splitDelimitedList(
 
     return Array.from(result);
 }
-

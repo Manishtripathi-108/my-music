@@ -2,16 +2,17 @@ import { VariantProps, cva } from 'class-variance-authority';
 
 import cn from '@/lib/cn';
 
-export const badgeVariants = cva('inline-flex items-center gap-1.5 font-medium transition-colors select-none font-mono tracking-wide', {
+export const badgeVariants = cva('inline-flex items-center gap-1.5 font-medium transition-colors select-none font-mono tracking-wide ', {
     variants: {
         variant: {
-            primary: 'bg-primary/10 text-primary border border-primary/20',
+            primary: 'bg-primary/10 text-primary shadow-2xs',
             solid: 'bg-primary text-primary-foreground shadow-xs',
-            secondary: 'bg-secondary text-secondary-foreground border border-secondary/20',
-            outline: 'border text-foreground bg-transparent',
-            accent: 'bg-accent text-accent-foreground border',
-            destructive: 'bg-destructive/10 text-destructive border border-destructive/20',
-            success: 'bg-success/10 text-success dark:text-success border border-success/20',
+            secondary: 'bg-secondary text-secondary-foreground shadow-2xs',
+            outline: 'text-foreground bg-muted/60 shadow-2xs',
+            accent: 'bg-accent text-accent-foreground shadow-2xs',
+            destructive: 'bg-destructive/15 text-destructive shadow-2xs',
+            success: 'bg-success/15 text-success dark:text-success shadow-2xs',
+            warning: 'bg-warning/20 text-warning-foreground dark:text-warning shadow-2xs',
         },
         size: {
             xs: 'px-1.5 py-0.5 text-[9px] rounded-md',

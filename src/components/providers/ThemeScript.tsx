@@ -1,16 +1,14 @@
 'use client';
 
-/* --------------------------- Theme Script Component ----------------------- */
+import { COLOR_SCHEME_STORAGE_KEY, DARK_QUERY, DEFAULT_COLOR_SCHEME, DEFAULT_MODE, MODE_STORAGE_KEY } from '@/lib/theme/constants';
 
-const THEME_STORAGE_KEY = 'theme';
-const DEFAULT_MODE = 'system';
-const DARK_QUERY = '(prefers-color-scheme: dark)';
+/* --------------------------- Theme Script Component ----------------------- */
 
 /**
  * Inline script that runs before React hydrates.
  *
- * Prevents a flash of the wrong theme by applying the saved
- * mode to the page as soon as it loads. Place it in `<head>`.
+ * Prevents a flash of the wrong theme or color scheme by applying the saved
+ * mode and color scheme to the root document element immediately. Place it in `<head>`.
  */
 export const ThemeScript = () => {
     return (
@@ -19,12 +17,14 @@ export const ThemeScript = () => {
                 __html: `
                     (function () {
                         try {
-                            const mode = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_MODE}';
+                            const mode = localStorage.getItem('${MODE_STORAGE_KEY}') || '${DEFAULT_MODE}';
                             const prefersDark = window.matchMedia('${DARK_QUERY}').matches;
-                            const activeTheme = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
+                            const isDark = mode === 'dark' || (mode === 'system' && prefersDark);
 
-                            document.documentElement.setAttribute('data-theme', activeTheme);
-                            document.documentElement.classList.toggle('dark', activeTheme === 'dark');
+                            document.documentElement.classList.toggle('dark', isDark);
+
+                            const scheme = localStorage.getItem('${COLOR_SCHEME_STORAGE_KEY}') || '${DEFAULT_COLOR_SCHEME}';
+                            document.documentElement.setAttribute('data-theme', scheme);
                         } catch (e) {
                             console.error("Error applying theme:", e);
                         }

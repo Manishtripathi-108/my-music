@@ -10,7 +10,7 @@ export interface CalendarProps extends Omit<DatePickerProps, 'inline'> {
 export function Calendar({ className, ...props }: CalendarProps) {
     return (
         <DatePicker inline className={cn('w-fit', className)} {...props}>
-            <DatePickerContent className="bg-card text-card-foreground rounded-2xl border p-4 shadow-xs">
+            <DatePickerContent className="bg-card text-card-foreground rounded-2xl p-4 shadow-xl">
                 <DatePickerCalendar />
             </DatePickerContent>
         </DatePicker>

@@ -11,10 +11,10 @@ export function StepsIndicator({ className, children, ...props }: StepsIndicator
     return (
         <ArkSteps.Indicator
             className={cn(
-                'group/indicator flex size-9 shrink-0 items-center justify-center rounded-xl border text-xs font-bold transition-all',
-                'bg-card text-muted-foreground border-border',
-                'ark-current:border-primary ark-current:bg-primary ark-current:text-primary-foreground ark-current:shadow-xs',
-                'ark-complete:border-primary/50 ark-complete:bg-primary/10 ark-complete:text-primary',
+                'group/indicator flex size-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold shadow-2xs transition-all',
+                'bg-card text-muted-foreground',
+                'ark-current:bg-primary ark-current:text-primary-foreground ark-current:shadow-sm',
+                'ark-complete:bg-primary/10 ark-complete:text-primary ark-complete:shadow-2xs',
                 className
             )}
             {...props}>

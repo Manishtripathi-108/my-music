@@ -10,10 +10,9 @@ export function FieldSelect({ className, ...props }: FieldSelectProps) {
     return (
         <ArkField.Select
             className={cn(
-                'bg-card text-foreground focus-visible:ring-ring',
-                'ark-invalid:border-destructive ark-invalid:focus-visible:ring-destructive',
-                'h-10 w-full rounded-xl border px-3.5 text-sm transition-all',
-                'focus-visible:border-transparent focus-visible:ring-2 focus-visible:outline-none',
+                'bg-input text-foreground focus:ring-ring rounded-xl font-mono inset-shadow-xs transition-all outline-none focus:ring-2',
+                'ark-invalid:ring-2 ark-invalid:ring-destructive ark-invalid:focus-visible:ring-destructive',
+                'h-10 w-full px-3.5 text-sm transition-all',
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 className
             )}
@@ -21,3 +20,5 @@ export function FieldSelect({ className, ...props }: FieldSelectProps) {
         />
     );
 }
+
+export default FieldSelect;

@@ -10,10 +10,9 @@ export function FieldInput({ className, ...props }: FieldInputProps) {
     return (
         <ArkField.Input
             className={cn(
-                'bg-card text-foreground placeholder:text-muted-foreground focus-visible:ring-ring',
-                'ark-invalid:border-destructive ark-invalid:focus-visible:ring-destructive',
-                'h-10 w-full rounded-xl border px-3.5 text-sm transition-all',
-                'focus-visible:border-transparent focus-visible:ring-2 focus-visible:outline-none',
+                'bg-input text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-xl font-mono inset-shadow-xs transition-all outline-none focus:ring-2',
+                'ark-invalid:ring-2 ark-invalid:ring-destructive ark-invalid:focus-visible:ring-destructive',
+                'h-10 w-full px-3.5 text-xs sm:text-sm',
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 className
             )}
@@ -21,3 +20,5 @@ export function FieldInput({ className, ...props }: FieldInputProps) {
         />
     );
 }
+
+export default FieldInput;

@@ -2,11 +2,15 @@
 
 import { useEffect } from 'react';
 
+/** Contract props passed to the top-level global error boundary */
 export interface GlobalErrorProps {
     error: Error & { digest?: string };
     reset: () => void;
 }
 
+/**
+ * Root-level error boundary rendering fallback HTML when the root layout fails.
+ */
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
     useEffect(() => {
         console.error('[Fatal Application Error]', error);

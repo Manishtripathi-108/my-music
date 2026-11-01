@@ -299,6 +299,25 @@ The media subsystem is three decoupled engines. Native binaries are the default;
 - Cache at `cache/art/<key>.<ext>` with `key = sha256(filePath + ":" + size + ":" + mtimeMs).slice(0, 24)`.
 - **Invalidate a file's cache entry on every tag write.** Padded in-place writes keep `size`, and restored timestamps keep `mtime`, so the key alone will not change.
 
+## Realistic UI design and animation standards
+
+Every component, interaction, animation, and visual effect must feel grounded in real-world physics and human perception. Treat realistic motion, natural interaction feedback, and physically believable design as core project principles, not optional polish. Apply them to all new components, refactors, UI updates, and animation changes.
+
+### Animation requirements
+
+1. **Natural motion:** Use professional easing curves, controlled acceleration, and smooth deceleration (`cubic-bezier(0.16, 1, 0.3, 1)`). Make movement feel purposeful rather than robotic or mechanical.
+2. **Physical feedback:** Model realistic physical properties such as weight, momentum, friction, spring tension, and inertia. Buttons should feel pressed when clicked, switches should respond like physical controls, and panels should move with a clear sense of mass and direction.
+3. **Professional button interactions:** Ban awkward floating transforms (`hover:-translate-y-*`), excessive scaling, abrupt movement, and generic hover effects. Use subtle changes in depth, scale (`active:scale-[0.985]`), shadow, optical illumination (`hover:brightness-[1.03]`), and inset compression (`active:shadow-inner active:inset-shadow-xs`) to create convincing hover, active, focus, and release states.
+4. **Context-aware animations:** Match each animation to the component and the action. Menus should open and close with natural motion. Dialogs should enter and exit with spatial continuity. Drawers should slide along their physical anchor edge. Loading indicators, notifications, transitions, and scrolling effects should each have appropriate mass and motion.
+5. **Consistent visual quality:** Keep animations coherent across the entire application. Use consistent timing (150ms-250ms for micro-interactions), easing, motion distance, and interaction feedback. Avoid excessive motion, distracting effects, and animations that add no value.
+6. **Performance and accessibility:** Keep animations fluid, responsive, and GPU-accelerated. Respect the user's reduced motion preference (`prefers-reduced-motion: reduce`). Preserve keyboard navigation, visible focus states (`focus-visible:ring-2`), and clear feedback for every interaction.
+
+### Native squircles and curvature standards
+
+- **Always use squircle for round objects:** Use the modern `corner-shape: squircle` property in CSS.
+- **Why squircles matter:** A true squircle uses a mathematical superellipse curve (`superellipse(2)`) rather than traditional circular arcs (`border-radius`), which cause a harsh curvature transition (a visual "speed bump") where the flat edge meets the curve. Squircles provide continuous curvature continuity (G2 continuity) identical to high-end industrial hardware and OS icon geometry.
+- **Application:** Apply `corner-shape: squircle` globally and on all rounded containers, cards, buttons, badges, avatars, dialogs, inputs, and pills alongside their `border-radius`.
+
 ## Naming and code clarity
 
 ### Files
@@ -395,4 +414,6 @@ Do not ask about placements this file already answers.
 - [ ] The diff contains no unrelated changes, new dependencies, or duplicated logic.
 - [ ] Tests are added or updated for changed behavior.
 - [ ] Bruno API collection files (`bruno/`) are updated to match any modified or added route handlers.
+- [ ] Animations and interactive controls follow realistic physical motion standards (no awkward hover translates; subtle press compression and spring release).
+- [ ] Round objects and curved elements enforce native squircle geometry (`corner-shape: squircle`).
 - [ ] The project's lint, typecheck, and test scripts (see `package.json`) pass.

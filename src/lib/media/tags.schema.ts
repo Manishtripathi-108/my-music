@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { listSchema, numberSchema, textSchema } from '../schema';
-import { compactKey, isKnownTagLibProperty, TAG_FIELDS } from './tag-registry';
+import { TAG_FIELDS, compactKey, isKnownTagLibProperty } from './tag-registry';
 
 type TagField = (typeof TAG_FIELDS)[number];
 

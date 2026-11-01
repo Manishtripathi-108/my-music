@@ -41,7 +41,10 @@ export function parseFieldValue(kind: ValueKind, value: string[]): unknown | und
             return value[0].trim();
 
         case 'freeText':
-            return value.map((v) => v.trim()).filter(Boolean).join('\n');
+            return value
+                .map((v) => v.trim())
+                .filter(Boolean)
+                .join('\n');
 
         case 'positiveInteger': {
             const trimmed = value[0].trim();

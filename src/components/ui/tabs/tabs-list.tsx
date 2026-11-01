@@ -12,8 +12,8 @@ export function TabsList({ variant = 'pill', className, ...props }: TabsListProp
     return (
         <ArkTabs.List
             className={cn(
-                'bg-card inline-flex items-center gap-1 self-start rounded-2xl border p-1',
-                variant === 'underline' && 'gap-4 rounded-none border-0 border-b bg-transparent p-0',
+                'bg-card inline-flex items-center gap-1 self-start rounded-2xl p-1 shadow-xs',
+                variant === 'underline' && 'gap-4 rounded-none bg-transparent p-0 shadow-none',
                 className
             )}
             {...props}

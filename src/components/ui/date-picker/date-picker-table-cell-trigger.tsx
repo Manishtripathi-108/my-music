@@ -17,7 +17,7 @@ export function DatePickerTableCellTrigger({ className, ...props }: DatePickerTa
 
                 'ark-selected:bg-primary ark-selected:text-primary-foreground',
 
-                'ark-today:border ark-today:border-primary',
+                'ark-today:ring-1 ark-today:ring-primary ark-today:font-bold',
 
                 '[&[data-in-range]:not([data-range-start]):not([data-range-end])]:rounded-none',
                 '[&[data-in-range]:not([data-range-start]):not([data-range-end])]:bg-accent',

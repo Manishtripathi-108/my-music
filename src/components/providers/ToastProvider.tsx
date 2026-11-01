@@ -5,9 +5,9 @@ import { GooeyToaster } from 'goey-toast';
 import useTheme from '@/hooks/useTheme';
 
 export function ToastProvider() {
-    const { activeTheme } = useTheme();
+    const { activeMode } = useTheme();
 
-    return <GooeyToaster position="bottom-right" theme={activeTheme} />;
+    return <GooeyToaster position="bottom-right" theme={activeMode} />;
 }
 
 export default ToastProvider;

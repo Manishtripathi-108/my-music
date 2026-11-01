@@ -10,7 +10,7 @@ export function RadioGroupItemControl({ className, children, ...props }: RadioGr
     return (
         <ArkRadioGroup.ItemControl
             className={cn(
-                'bg-card group-hover:border-primary/60 group-ark-checked:border-primary group-ark-checked:bg-primary group-ark-checked:text-primary-foreground group-focus-visible:ring-ring mt-0.5 flex size-4.5 shrink-0 items-center justify-center rounded-full border transition-all group-focus-visible:ring-2',
+                'bg-card group-ark-checked:bg-primary group-ark-checked:text-primary-foreground group-ark-checked:shadow-xs group-focus-visible:ring-ring mt-0.5 flex size-4.5 shrink-0 items-center justify-center rounded-full inset-shadow-xs transition-all outline-none group-focus-visible:ring-2',
                 className
             )}
             {...props}>

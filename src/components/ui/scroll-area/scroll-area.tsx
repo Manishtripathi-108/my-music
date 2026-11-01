@@ -7,5 +7,5 @@ import cn from '@/lib/cn';
 export type ScrollAreaProps = ArkScrollArea.RootProps;
 
 export function ScrollArea({ className, ...props }: ScrollAreaProps) {
-    return <ArkScrollArea.Root className={cn('bg-card relative w-full overflow-hidden rounded-2xl border', className)} {...props} />;
+    return <ArkScrollArea.Root className={cn('bg-card relative w-full overflow-hidden rounded-2xl shadow-xs', className)} {...props} />;
 }

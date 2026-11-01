@@ -10,7 +10,7 @@ export function DateInputSegmentGroup({ className, ...props }: DateInputSegmentG
     return (
         <ArkDateInput.SegmentGroup
             className={cn(
-                'bg-card text-foreground ark-invalid:border-destructive focus-within:ring-ring ark-invalid:ring-destructive flex h-10 w-full items-center rounded-xl border px-3 text-sm font-medium transition-all focus-within:border-transparent focus-within:ring-2 focus-within:outline-none',
+                'bg-input text-foreground ark-invalid:ring-destructive focus-within:ring-ring flex h-10 w-full items-center rounded-xl px-3 text-sm font-medium inset-shadow-xs transition-all outline-none focus-within:ring-2',
                 className
             )}
             {...props}>

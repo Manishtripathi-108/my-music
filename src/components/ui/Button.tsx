@@ -1,57 +1,75 @@
 import * as React from 'react';
 
+import Link from 'next/link';
+
 import { type VariantProps, cva } from 'class-variance-authority';
 
 import cn from '@/lib/cn';
 
-const buttonVariants = cva(
+/* -------------------------------- Variants -------------------------------- */
+
+/**
+ * Class-variance-authority recipe for physical tactile buttons.
+ * Composes idle elevation, hover lift, focus indicators, and indented active feedback.
+ */
+export const buttonVariants = cva(
     [
-        'inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap cursor-pointer',
-        'rounded-[18px] border text-sm font-medium leading-none',
-        'outline-none transition-[border-radius,transform,background-color,color,border-color]',
-        'duration-300 ease-out',
-        'select-none',
+        'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer',
+        'font-mono font-medium leading-none select-none outline-none ',
+        'shadow-sm transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
+        'hover:shadow-md hover:brightness-[1.03]',
+        'active:scale-[0.985] active:shadow-inner active:inset-shadow-xs active:brightness-[0.97]',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
-        'hover:scale-[1.02] active:scale-[0.98]',
-        'hover:rounded-none active:rounded-none focus-visible:rounded-none',
+        'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
     ],
     {
         variants: {
             variant: {
-                primary: ['border-primary bg-primary text-primary-foreground', 'hover:bg-primary/90', 'active:bg-primary/80'],
+                primary: ['bg-primary text-primary-foreground', 'hover:bg-primary/90', 'active:bg-primary/80'],
 
-                secondary: ['border-secondary bg-secondary text-secondary-foreground', 'hover:bg-secondary/80', 'active:bg-secondary/70'],
+                dark: [
+                    'bg-neutral-900 text-white tracking-wider dark:bg-neutral-800 shadow-md',
+                    'hover:bg-neutral-800 dark:hover:bg-neutral-700',
+                    'active:bg-neutral-950 dark:active:bg-neutral-900',
+                ],
 
-                outline: ['border-input bg-background text-foreground', 'hover:bg-accent hover:text-accent-foreground', 'active:bg-accent/80'],
+                slate: [
+                    'bg-neutral-600 text-white tracking-wider dark:bg-neutral-700 shadow-md',
+                    'hover:bg-neutral-700 dark:hover:bg-neutral-600',
+                    'active:bg-neutral-800 dark:active:bg-neutral-800',
+                ],
 
-                ghost: ['border-transparent bg-transparent text-foreground', 'hover:bg-accent hover:text-accent-foreground', 'active:bg-accent/80'],
+                secondary: ['bg-secondary text-secondary-foreground', 'hover:bg-secondary/80', 'active:bg-secondary/70'],
 
-                destructive: ['border-destructive bg-destructive text-destructive-foreground', 'hover:bg-destructive/90', 'active:bg-destructive/80'],
+                outline: ['bg-card text-foreground shadow-xs', 'hover:bg-accent hover:text-accent-foreground', 'active:bg-accent/80'],
 
-                success: ['border-success bg-success text-success-foreground', 'hover:bg-success/90', 'active:bg-success/80'],
+                ghost: [
+                    'bg-transparent text-foreground shadow-none',
+                    'hover:bg-accent hover:text-accent-foreground hover:shadow-none',
+                    'active:bg-accent/80',
+                ],
 
-                warning: ['border-warning bg-warning text-warning-foreground', 'hover:bg-warning/90', 'active:bg-warning/80'],
+                destructive: ['bg-destructive text-destructive-foreground', 'hover:bg-destructive/90', 'active:bg-destructive/80'],
+
+                success: ['bg-success text-success-foreground', 'hover:bg-success/90', 'active:bg-success/80'],
+
+                warning: ['bg-warning text-warning-foreground', 'hover:bg-warning/90', 'active:bg-warning/80'],
 
                 link: [
-                    'h-auto rounded-sm border-transparent bg-transparent p-0',
+                    'h-auto rounded-none bg-transparent p-0 shadow-none',
                     'text-primary underline-offset-4',
-                    'hover:underline',
-                    'active:text-primary/80',
+                    'hover:underline hover:shadow-none hover:brightness-100',
+                    'active:text-primary/80 active:scale-100 active:shadow-none active:inset-shadow-none',
                     'focus-visible:ring-2',
                 ],
             },
 
             size: {
-                xs: ['h-7 px-2', 'text-xs', 'rounded-[14px]'],
-
-                sm: ['h-8 px-3', 'text-xs', 'rounded-[16px]'],
-
-                md: ['h-9 px-4', 'text-sm', 'rounded-[18px]'],
-
-                lg: ['h-10 px-5', 'text-sm', 'rounded-[20px]'],
-
-                xl: ['h-11 px-6', 'text-base', 'rounded-[22px]'],
+                xs: ['h-7 px-2.5', 'text-xs', 'rounded-lg'],
+                sm: ['h-8 px-3', 'text-xs', 'rounded-lg'],
+                md: ['h-9.5 px-4', 'text-sm', 'rounded-xl'],
+                lg: ['h-11 px-5', 'text-sm', 'rounded-xl'],
+                xl: ['h-14 px-6', 'text-sm font-bold tracking-wider', 'rounded-2xl'],
             },
         },
 
@@ -62,12 +80,66 @@ const buttonVariants = cva(
     }
 );
 
-type ButtonProps = React.ComponentProps<'button'> & VariantProps<typeof buttonVariants>;
+/* ---------------------------------- Types --------------------------------- */
 
-export function Button({ className, variant, size, type = 'button', ...props }: ButtonProps) {
-    return <button type={type} className={cn(buttonVariants({ variant, size }), className)} {...props} />;
-}
+type BaseButtonProps = VariantProps<typeof buttonVariants> & {
+    className?: string;
+    children?: React.ReactNode;
+};
 
-export { buttonVariants };
+/** Props accepted when rendered as a standard interactive HTML button */
+export type ButtonAsButton = BaseButtonProps &
+    Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, keyof BaseButtonProps> & {
+        href?: undefined;
+    };
+
+/** Props accepted when rendered polymorphically as a Next.js navigational Link */
+export type ButtonAsLink = BaseButtonProps &
+    Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, keyof BaseButtonProps | 'href'> & {
+        href: React.ComponentProps<typeof Link>['href'];
+        replace?: boolean;
+        scroll?: boolean;
+        prefetch?: boolean;
+    };
+
+/** Polymorphic button props supporting either button attributes or Next.js Link props */
+export type ButtonProps = ButtonAsButton | ButtonAsLink;
+
+/* -------------------------------- Component ------------------------------- */
+
+/**
+ * Polymorphic tactile button component.
+ * Renders an accessible HTML button by default or a Next.js Link when href is provided.
+ */
+export const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonProps>(function Button(props, ref) {
+    const { className, variant, size, ...rest } = props;
+
+    if ('href' in rest && rest.href != null) {
+        const { href, replace, scroll, prefetch, ...linkProps } = rest as ButtonAsLink;
+        return (
+            <Link
+                ref={ref as React.ForwardedRef<HTMLAnchorElement>}
+                href={href}
+                replace={replace}
+                scroll={scroll}
+                prefetch={prefetch}
+                className={cn(buttonVariants({ variant, size }), className)}
+                {...linkProps}
+            />
+        );
+    }
+
+    const { type = 'button', ...buttonProps } = rest as ButtonAsButton;
+    return (
+        <button
+            ref={ref as React.ForwardedRef<HTMLButtonElement>}
+            type={type}
+            className={cn(buttonVariants({ variant, size }), className)}
+            {...buttonProps}
+        />
+    );
+});
+
+Button.displayName = 'Button';
 
 export default Button;

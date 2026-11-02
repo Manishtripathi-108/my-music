@@ -6,7 +6,6 @@ import { z } from 'zod';
  * Adheres to strict server/client boundary: never imported into client bundles.
  */
 const serverEnvSchema = z.object({
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
     ALLOWED_MEDIA_ROOTS: z
         .string()
@@ -40,6 +39,6 @@ if (!parsed.success) {
 export const serverEnv = parsed.data;
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
-export const isProduction = serverEnv.NODE_ENV === 'production';
-export const isDevelopment = serverEnv.NODE_ENV === 'development';
-export const isTest = serverEnv.NODE_ENV === 'test';
+export const isProduction = process.env.NODE_ENV === 'production';
+export const isDevelopment = process.env.NODE_ENV === 'development';
+export const isTest = process.env.NODE_ENV === 'test';

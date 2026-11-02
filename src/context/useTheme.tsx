@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { type PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import { flushSync } from 'react-dom';
 
+import { isBrowser } from '@/lib/storage';
 import {
     applyModeToDOM,
     getNextMode,
@@ -15,12 +16,10 @@ import {
     subscribeToMode,
     subscribeToShape,
     subscribeToSystemMode,
-    toActiveMode,
 } from '@/lib/theme/color-mode';
 import { applyColorSchemeToDOM, getNextColorScheme, getSavedColorScheme, persistColorScheme, subscribeToColorScheme } from '@/lib/theme/color-scheme';
-import { COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, DEFAULT_MODE, DEFAULT_SHAPE, MODES, TRANSITION_SHAPES } from '@/lib/theme/constants';
+import { COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, DEFAULT_EASING, DEFAULT_MODE, DEFAULT_SHAPE, MODES, TRANSITION_SHAPES } from '@/lib/theme/constants';
 import { updateMetaColor } from '@/lib/theme/meta-color';
-import { isBrowser } from '@/lib/storage';
 import { getClipPaths } from '@/lib/theme/transitions';
 import type { ActiveMode, UseThemeOptions, UseThemeReturn } from '@/lib/theme/types';
 
@@ -46,7 +45,7 @@ import type { ActiveMode, UseThemeOptions, UseThemeReturn } from '@/lib/theme/ty
  *     {activeMode}
  * </button>
  */
-const useTheme = ({ duration = 450 }: UseThemeOptions = {}): UseThemeReturn => {
+const useThemeStore = ({ duration = 450, shape: shapeOption, easing = DEFAULT_EASING }: UseThemeOptions = {}): UseThemeReturn => {
     const mode = useSyncExternalStore(subscribeToMode, getSavedMode, () => DEFAULT_MODE);
     const shape = useSyncExternalStore(subscribeToShape, getSavedShape, () => DEFAULT_SHAPE);
     const colorScheme = useSyncExternalStore(subscribeToColorScheme, getSavedColorScheme, () => DEFAULT_COLOR_SCHEME);
@@ -78,7 +77,7 @@ const useTheme = ({ duration = 450 }: UseThemeOptions = {}): UseThemeReturn => {
     }, [setMode]);
 
     const setModeAnimated = useCallback(
-        (newMode: typeof mode, x?: number, y?: number, shapeOverride?: typeof shape) => {
+        (newMode: typeof mode, x?: number, y?: number) => {
             const prefersReducedMotion = isBrowser && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
             if (typeof document === 'undefined' || typeof document.startViewTransition !== 'function' || prefersReducedMotion) {
@@ -86,7 +85,7 @@ const useTheme = ({ duration = 450 }: UseThemeOptions = {}): UseThemeReturn => {
                 return;
             }
 
-            const chosenShape = shapeOverride ?? shape;
+            const chosenShape = shapeOption ?? shape;
 
             const transition = document.startViewTransition(() => {
                 flushSync(() => setMode(newMode));
@@ -106,7 +105,7 @@ const useTheme = ({ duration = 450 }: UseThemeOptions = {}): UseThemeReturn => {
                         { clipPath: [startClip, endClip] },
                         {
                             duration,
-                            easing: 'ease-in-out',
+                            easing,
                             pseudoElement: '::view-transition-new(root)',
                         }
                     );
@@ -115,13 +114,13 @@ const useTheme = ({ duration = 450 }: UseThemeOptions = {}): UseThemeReturn => {
                     // The mode has changed even if the custom animation fails.
                 });
         },
-        [setMode, duration, shape]
+        [setMode, duration, easing, shapeOption, shape]
     );
 
     /** Moves to the next mode with a reveal animation starting at (x, y). */
     const cycleModeAnimated = useCallback(
-        (x?: number, y?: number, shapeOverride?: typeof shape) => {
-            setModeAnimated(getNextMode(getSavedMode()), x, y, shapeOverride);
+        (x?: number, y?: number) => {
+            setModeAnimated(getNextMode(getSavedMode()), x, y);
         },
         [setModeAnimated]
     );
@@ -138,27 +137,71 @@ const useTheme = ({ duration = 450 }: UseThemeOptions = {}): UseThemeReturn => {
         applyColorSchemeToDOM(colorScheme);
     }, [colorScheme]);
 
-    return {
-        mode,
-        activeMode: toActiveMode(mode),
-        nextMode: getNextMode(mode),
-        shape,
-        shapes: TRANSITION_SHAPES,
-        setMode,
-        setShape,
-        cycleMode,
-        setModeAnimated,
-        cycleModeAnimated,
-        colorScheme,
-        setColorScheme,
-        cycleColorScheme,
-        colorSchemes: COLOR_SCHEMES,
-        modes: MODES,
-    };
+    return useMemo<UseThemeReturn>(
+        () => ({
+            mode,
+            activeMode,
+            nextMode: getNextMode(mode),
+
+            shape,
+            shapes: TRANSITION_SHAPES,
+
+            setMode,
+            setShape,
+            cycleMode,
+            setModeAnimated,
+            cycleModeAnimated,
+
+            colorScheme,
+            setColorScheme,
+            cycleColorScheme,
+
+            colorSchemes: COLOR_SCHEMES,
+            modes: MODES,
+        }),
+        [mode, activeMode, shape, setMode, setShape, cycleMode, setModeAnimated, cycleModeAnimated, colorScheme, setColorScheme, cycleColorScheme]
+    );
+};
+
+/* --------------------------------- Context -------------------------------- */
+
+const ThemeContext = createContext<UseThemeReturn | null>(null);
+
+type ThemeProviderProps = PropsWithChildren<UseThemeOptions>;
+
+/* -------------------------------- Provider -------------------------------- */
+
+/**
+ * Provides the application's theme state and actions to all descendants.
+ *
+ * Owns the theme store subscription and DOM synchronization effects.
+ */
+const ThemeProvider = ({ children, ...options }: ThemeProviderProps) => {
+    const theme = useThemeStore(options);
+
+    return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+};
+
+/* -------------------------------- Hook ------------------------------------ */
+
+/**
+ * Accesses the theme state and actions from ThemeContext.
+ *
+ * @throws Error when used outside ThemeProvider.
+ */
+const useTheme = (): UseThemeReturn => {
+    const context = useContext(ThemeContext);
+
+    if (!context) {
+        throw new Error('useTheme must be used within ThemeProvider');
+    }
+
+    return context;
 };
 
 export { ThemeScript } from '@/components/providers/ThemeScript';
-export { MODES } from '@/lib/theme/constants';
+export { DEFAULT_EASING, MODES, TRANSITION_EASING } from '@/lib/theme/constants';
 export { updateMetaColor } from '@/lib/theme/meta-color';
+export { ThemeProvider, useTheme, useThemeStore };
 
 export default useTheme;

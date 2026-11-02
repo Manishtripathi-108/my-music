@@ -26,6 +26,10 @@ export interface ShapeOption {
 export interface UseThemeOptions {
     /** Animation length in milliseconds. Defaults to `450`. */
     duration?: number;
+    /** Transition shape to use for reveal animations. Defaults to saved shape or DEFAULT_SHAPE. */
+    shape?: TransitionShape;
+    /** Any CSS easing string. See TRANSITION_EASING for presets. */
+    easing?: string;
 }
 
 /** Sets a mode directly, or computes it from the current one. */
@@ -95,16 +99,15 @@ export interface UseThemeReturn {
     /** Jump to the next mode (light → dark → system) without animation. */
     cycleMode: () => void;
     /** Jump to the next mode with a reveal animation. */
-    setModeAnimated: (newMode: ColorMode, x?: number, y?: number, shapeOverride?: TransitionShape) => void;
+    setModeAnimated: (newMode: ColorMode, x?: number, y?: number) => void;
     /**
      * Jump to the next mode with a reveal animation.
      * Falls back to {@link UseThemeReturn.cycleMode} if the View Transition API is missing.
      *
      * @param x - Animation start X in px. Defaults to screen center.
      * @param y - Animation start Y in px. Defaults to screen center.
-     * @param shapeOverride - Use this shape once instead of the saved one.
      */
-    cycleModeAnimated: (x?: number, y?: number, shapeOverride?: TransitionShape) => void;
+    cycleModeAnimated: (x?: number, y?: number) => void;
     /** The currently active color scheme identifier. */
     colorScheme: ColorScheme;
     /** Change the active color scheme. */

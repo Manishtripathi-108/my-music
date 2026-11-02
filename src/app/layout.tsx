@@ -7,6 +7,7 @@ import 'goey-toast/styles.css';
 import '@/app/globals.css';
 import ThemeScript from '@/components/providers/ThemeScript';
 import ToastProvider from '@/components/providers/ToastProvider';
+import { ThemeProvider } from '@/context/useTheme';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',
@@ -41,8 +42,10 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
                 <ThemeScript />
             </head>
             <body className="bg-background text-foreground flex min-h-screen flex-col font-sans antialiased transition-colors duration-300">
-                {children}
-                <ToastProvider />
+                <ThemeProvider>
+                    {children}
+                    <ToastProvider />
+                </ThemeProvider>
             </body>
         </html>
     );

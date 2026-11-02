@@ -38,6 +38,21 @@ export const DEFAULT_COLOR_SCHEME: ColorScheme = 'cloud';
 
 export const DEFAULT_META_VAR = '--background';
 
+/* --------------------------- Transition Easings --------------------------- */
+
+export const TRANSITION_EASING = {
+    /** Material 3 "emphasized": fast start, long soft landing. Best default for reveals. */
+    emphasized: 'cubic-bezier(0.2, 0, 0, 1)',
+    /** Material 3 "emphasized decelerate": snappier, for shorter durations (≤ 350ms). */
+    emphasizedDecelerate: 'cubic-bezier(0.05, 0.7, 0.1, 1)',
+    /** Easing-function classic (easeOutQuart): smooth and slightly softer than emphasized. */
+    easeOutQuart: 'cubic-bezier(0.25, 1, 0.5, 1)',
+    /** Symmetric option if you prefer a gentle start (easeInOutCubic). */
+    easeInOutCubic: 'cubic-bezier(0.65, 0, 0.35, 1)',
+} as const;
+
+export const DEFAULT_EASING = TRANSITION_EASING.emphasized;
+
 /* ------------------------------- Media Query ------------------------------ */
 
 /** Media query that matches when the OS prefers dark. */

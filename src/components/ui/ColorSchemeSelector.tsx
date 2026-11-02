@@ -5,7 +5,7 @@ import * as React from 'react';
 import { Menu as ArkMenu } from '@ark-ui/react/menu';
 
 import Icon from '@/components/ui/Icon';
-import useTheme from '@/hooks/useTheme';
+import useTheme from '@/context/useTheme';
 import cn from '@/lib/cn';
 import type { ColorScheme } from '@/lib/theme/types';
 

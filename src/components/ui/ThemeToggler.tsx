@@ -1,7 +1,7 @@
 'use client';
 
 import Icon from '@/components/ui/Icon';
-import useTheme from '@/hooks/useTheme';
+import useTheme from '@/context/useTheme';
 import cn from '@/lib/cn';
 
 import { Button } from './Button';

@@ -2,7 +2,7 @@
 
 import { GooeyToaster } from 'goey-toast';
 
-import useTheme from '@/hooks/useTheme';
+import useTheme from '@/context/useTheme';
 
 export function ToastProvider() {
     const { activeMode } = useTheme();

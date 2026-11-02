@@ -116,7 +116,7 @@ import {
 } from '@/components/ui/steps';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TreeNode, TreeView, TreeViewLabel, TreeViewTree, createTreeCollection } from '@/components/ui/tree-view';
-import useTheme from '@/hooks/useTheme';
+import useTheme from '@/context/useTheme';
 import cn from '@/lib/cn';
 
 // Sample tree collection for TreeView

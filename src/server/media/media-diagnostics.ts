@@ -5,6 +5,7 @@ import { MediaInfoAdapter } from './adapters/mediainfo.adapter';
 import { TagLibAdapter } from './adapters/taglib.adapter';
 import { MediaConverter } from './media-converter';
 import { type EngineHealth, type HealthStatus, type ToolHealth, mergeHealthStatus } from './tool-inspector';
+import type { ToolHealthProvider } from './types';
 
 export type { Engine, HealthStatus, ToolHealth } from './tool-inspector';
 
@@ -41,30 +42,40 @@ export interface MediaDiagnosticsReport {
 /**
  * Aggregates health diagnostics from all media engine adapters.
  *
- * All native tool inspections run in parallel.
- * Each adapter owns its engine configuration and implementation availability.
+ * All tool inspections run in parallel via instance methods.
+ * Adapters may be injected for unit testing or custom environments.
  */
-export async function getMediaDiagnostics(): Promise<MediaDiagnosticsReport> {
-    const [taglib, ffprobe, mediaInfo, ffmpeg] = await Promise.all([
-        TagLibAdapter.getToolHealth(),
-        FFprobeAdapter.getToolHealth(),
-        MediaInfoAdapter.getToolHealth(),
-        MediaConverter.getToolHealth(),
+export async function getMediaDiagnostics(
+    taglib: ToolHealthProvider = new TagLibAdapter(),
+    ffprobe: ToolHealthProvider = new FFprobeAdapter(),
+    mediaInfo: ToolHealthProvider = new MediaInfoAdapter(),
+    converter: ToolHealthProvider = new MediaConverter()
+): Promise<MediaDiagnosticsReport> {
+    const [taglibHealth, ffprobeHealth, mediaInfoHealth, ffmpegHealth] = await Promise.all([
+        taglib.getToolHealth(),
+        ffprobe.getToolHealth(),
+        mediaInfo.getToolHealth(),
+        converter.getToolHealth(),
     ]);
 
-    const metadataStatus = taglib.status;
-    const probingStatus = mergeHealthStatus([ffprobe.status, mediaInfo.status]);
-    const conversionStatus = ffmpeg.status;
+    const metadataStatus = taglibHealth.status;
+    const probingStatus = mergeHealthStatus([ffprobeHealth.status, mediaInfoHealth.status]);
+    const conversionStatus = ffmpegHealth.status;
     const overallStatus = mergeHealthStatus([metadataStatus, probingStatus, conversionStatus]);
 
-    const warnings = collectWarnings({ taglib, ffprobe, mediaInfo, ffmpeg });
+    const warnings = collectWarnings({
+        taglib: taglibHealth,
+        ffprobe: ffprobeHealth,
+        mediaInfo: mediaInfoHealth,
+        ffmpeg: ffmpegHealth,
+    });
 
     return {
         status: overallStatus,
         engines: {
-            metadata: { status: metadataStatus, tools: { taglib } },
-            probing: { status: probingStatus, tools: { ffprobe, mediaInfo } },
-            conversion: { status: conversionStatus, tools: { ffmpeg } },
+            metadata: { status: metadataStatus, tools: { taglib: taglibHealth } },
+            probing: { status: probingStatus, tools: { ffprobe: ffprobeHealth, mediaInfo: mediaInfoHealth } },
+            conversion: { status: conversionStatus, tools: { ffmpeg: ffmpegHealth } },
         },
         warnings,
         timestamp: new Date().toISOString(),

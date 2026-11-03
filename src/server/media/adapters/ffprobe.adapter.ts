@@ -8,7 +8,7 @@ import { isLosslessAudio } from '@/lib/media';
 import { parseNumber } from '@/lib/number';
 
 import { type ToolHealth, evaluateToolHealth } from '../tool-inspector';
-import type { TechnicalAudioInfo } from '../types';
+import type { AudioProberAdapter, TechnicalAudioInfo } from '../types';
 
 const execFileAsync = promisify(execFile);
 
@@ -49,7 +49,7 @@ function parseFFprobeVersion(output: string): string | null {
  * FFprobe Technical Audio Stream Prober Adapter.
  * Inspects elementary audio streams, packet dispositions, and container attributes.
  */
-export class FFprobeAdapter {
+export class FFprobeAdapter implements AudioProberAdapter {
     private readonly binaryPath: string;
 
     constructor(binaryPath = serverEnv.FFPROBE_PATH) {
@@ -57,10 +57,17 @@ export class FFprobeAdapter {
     }
 
     /**
-     * Returns health diagnostics for this adapter.
+     * Returns health diagnostics for this adapter instance.
+     */
+    public async getToolHealth(): Promise<ToolHealth> {
+        return evaluateToolHealth('ffprobe', this.binaryPath, ['-version'], parseFFprobeVersion, serverEnv.PROBING_ENGINE);
+    }
+
+    /**
+     * Static convenience accessor for health diagnostics.
      */
     public static async getToolHealth(): Promise<ToolHealth> {
-        return evaluateToolHealth('ffprobe', serverEnv.FFPROBE_PATH, ['-version'], parseFFprobeVersion, serverEnv.PROBING_ENGINE);
+        return new FFprobeAdapter().getToolHealth();
     }
 
     /**

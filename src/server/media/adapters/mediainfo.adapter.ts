@@ -9,7 +9,7 @@ import { parseBitrateMode } from '@/lib/media';
 import { parseOptionalNumber } from '@/lib/number';
 
 import { type ToolHealth, evaluateToolHealth } from '../tool-inspector';
-import type { MediaInfoQC } from '../types';
+import type { MediaInfoQC, QualityControlAdapter } from '../types';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,15 +34,19 @@ async function getWasmMediaInfoInstance() {
  * MediaInfo Forensic Quality-Control Adapter.
  * Supports native MediaInfo CLI with high-performance WASM fallback.
  */
-export class MediaInfoAdapter {
+export class MediaInfoAdapter implements QualityControlAdapter {
     private readonly binaryPath: string;
 
     constructor(binaryPath = serverEnv.MEDIAINFO_PATH) {
         this.binaryPath = binaryPath;
     }
 
+    public async getToolHealth(): Promise<ToolHealth> {
+        return evaluateToolHealth('mediaInfo', this.binaryPath, ['--version'], parseMediaInfoVersion, serverEnv.PROBING_ENGINE);
+    }
+
     public static async getToolHealth(): Promise<ToolHealth> {
-        return evaluateToolHealth('mediaInfo', serverEnv.MEDIAINFO_PATH, ['--version'], parseMediaInfoVersion, serverEnv.PROBING_ENGINE);
+        return new MediaInfoAdapter().getToolHealth();
     }
 
     public async inspect(canonicalPath: string): Promise<MediaInfoQC> {

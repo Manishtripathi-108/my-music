@@ -1,4 +1,5 @@
-import type { AudioTags, BitrateMode, ConversionTargetFormat } from '@/lib/media';
+import type { AudioTags, BitrateMode, ConversionTargetFormat, WriteAudioTags } from '@/lib/media';
+import type { ToolHealth } from './tool-inspector';
 
 /* -------------------------- Artwork Domain Models ------------------------- */
 
@@ -138,4 +139,43 @@ export interface ConversionResult {
     targetFormat: ConversionTargetFormat;
     sizeBytes: number;
     duration: number;
+}
+
+/* ---------------------- Adapter & Health Interfaces ----------------------- */
+
+/** Common contract for components that report engine and tool health diagnostics. */
+export interface ToolHealthProvider {
+    getToolHealth(): Promise<ToolHealth>;
+}
+
+/** Audio Metadata Adapter interface for reading and writing audio tags and artwork. */
+export interface MetadataAdapter extends ToolHealthProvider {
+    readTags(canonicalPath: string): Promise<{
+        tags: AudioTags;
+        raw: Record<string, unknown>;
+        artwork: RawPictureData | null;
+    }>;
+    writeTags(canonicalPath: string, tags: WriteAudioTags, options?: TagWriteOptions): Promise<TagWriteResult>;
+    embedArtwork(canonicalPath: string, imageBuffer: Buffer, mimeType?: string, options?: TagWriteOptions): Promise<TagWriteResult>;
+    removeArtwork(canonicalPath: string, options?: TagWriteOptions): Promise<TagWriteResult>;
+}
+
+/** Audio Prober Adapter interface for stream parameters and container format inspection. */
+export interface AudioProberAdapter extends ToolHealthProvider {
+    inspect(canonicalPath: string): Promise<TechnicalAudioInfo>;
+}
+
+/** Quality-Control Prober Adapter interface for forensic media and bitrate metrics. */
+export interface QualityControlAdapter extends ToolHealthProvider {
+    inspect(canonicalPath: string): Promise<MediaInfoQC>;
+}
+
+/** Media Converter Engine interface for audio transcoding and DSP operations. */
+export interface MediaConverterEngine extends ToolHealthProvider {
+    convert(
+        inputPath: string,
+        options: ConversionOptions,
+        onProgress?: ConversionProgressCallback,
+        signal?: AbortSignal
+    ): Promise<ConversionResult>;
 }

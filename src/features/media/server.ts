@@ -10,3 +10,10 @@ export {
     type ProbingEngineHealth,
     type ConversionEngineHealth,
 } from '@/server/media/media-diagnostics';
+export type {
+    ToolHealthProvider,
+    MetadataAdapter,
+    AudioProberAdapter,
+    QualityControlAdapter,
+    MediaConverterEngine,
+} from '@/server/media/types';

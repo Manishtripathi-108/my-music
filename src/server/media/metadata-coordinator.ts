@@ -14,10 +14,13 @@ import { MediaInfoAdapter } from './adapters/mediainfo.adapter';
 import { TagLibAdapter } from './adapters/taglib.adapter';
 import { authorizeInputPath } from './path-security';
 import type {
+    AudioProberAdapter,
     BatchTagWriteFailure,
     BatchTagWriteResult,
     CombinedAudioMetadata,
     ExtractedArtwork,
+    MetadataAdapter,
+    QualityControlAdapter,
     ReadAudioOptions,
     TagWriteOptions,
     TagWriteResult,
@@ -47,16 +50,16 @@ async function getImageMetadata(buffer: Buffer): Promise<{ width?: number; heigh
  * and artwork caching into unified models.
  */
 export class MetadataCoordinator {
-    private readonly taglib: TagLibAdapter;
-    private readonly ffprobe: FFprobeAdapter;
-    private readonly mediaInfo: MediaInfoAdapter;
+    private readonly taglib: MetadataAdapter;
+    private readonly ffprobe: AudioProberAdapter;
+    private readonly mediaInfo: QualityControlAdapter;
     private readonly cacheDir: string;
     private readonly activeExtractions = new Map<string, Promise<ExtractedArtwork | null>>();
 
     constructor(
-        taglib = new TagLibAdapter(),
-        ffprobe = new FFprobeAdapter(),
-        mediaInfo = new MediaInfoAdapter(),
+        taglib: MetadataAdapter = new TagLibAdapter(),
+        ffprobe: AudioProberAdapter = new FFprobeAdapter(),
+        mediaInfo: QualityControlAdapter = new MediaInfoAdapter(),
         cacheDir = serverEnv.ART_CACHE_DIR
     ) {
         this.taglib = taglib;

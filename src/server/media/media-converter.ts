@@ -10,14 +10,14 @@ import { clamp, parseFloatNumber, parseOptionalNumber } from '@/lib/number';
 import { FFprobeAdapter } from './adapters/ffprobe.adapter';
 import { authorizeInputPath, authorizeOutputPath } from './path-security';
 import { type ToolHealth, evaluateToolHealth } from './tool-inspector';
-import type { ConversionOptions, ConversionProgress, ConversionProgressCallback, ConversionResult } from './types';
+import type { ConversionOptions, ConversionProgress, ConversionProgressCallback, ConversionResult, MediaConverterEngine } from './types';
 
 /**
  * Audio Conversion and Digital Signal Processing (DSP) Engine.
  * Wraps native FFmpeg with libsoxr resampling, triangular dithering,
  * real-time progress parsing, and atomic sibling temp delivery.
  */
-export class MediaConverter {
+export class MediaConverter implements MediaConverterEngine {
     private readonly ffmpegPath: string;
     private readonly prober: FFprobeAdapter;
 
@@ -27,16 +27,23 @@ export class MediaConverter {
     }
 
     /**
-     * Returns health diagnostics for this adapter.
+     * Returns health diagnostics for this converter instance.
      */
-    public static async getToolHealth(): Promise<ToolHealth> {
+    public async getToolHealth(): Promise<ToolHealth> {
         return evaluateToolHealth(
             'ffmpeg',
-            serverEnv.FFMPEG_PATH,
+            this.ffmpegPath,
             ['-version'],
             (output) => output.match(/ffmpeg version\s+([^\s,]+)/i)?.[1] ?? null,
             serverEnv.CONVERSION_ENGINE
         );
+    }
+
+    /**
+     * Static convenience accessor for health diagnostics.
+     */
+    public static async getToolHealth(): Promise<ToolHealth> {
+        return new MediaConverter().getToolHealth();
     }
 
     /**

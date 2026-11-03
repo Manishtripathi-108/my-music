@@ -8,18 +8,18 @@ import { serverEnv } from '@/config/env.server';
 import type { AudioTags, WriteAudioTags } from '@/lib/media';
 
 import { type ToolHealth } from '../tool-inspector';
-import type { RawPictureData, TagWriteOptions, TagWriteResult } from '../types';
+import type { MetadataAdapter, RawPictureData, TagWriteOptions, TagWriteResult } from '../types';
 import { TagMapper } from './tag-mapper';
 
 /**
  * Audio Metadata Adapter powered by TagLib 2.x (taglib-wasm).
  * Preserves audio bitstreams bit-for-bit with atomic crash-safe writes.
  */
-export class TagLibAdapter {
+export class TagLibAdapter implements MetadataAdapter {
     /**
-     * Returns health diagnostics for this adapter.
+     * Returns health diagnostics for this adapter instance.
      */
-    public static async getToolHealth(): Promise<ToolHealth> {
+    public async getToolHealth(): Promise<ToolHealth> {
         return {
             configured: serverEnv.METADATA_ENGINE,
             active: 'wasm',
@@ -29,6 +29,13 @@ export class TagLibAdapter {
             },
             status: 'healthy',
         };
+    }
+
+    /**
+     * Static convenience accessor for health diagnostics.
+     */
+    public static async getToolHealth(): Promise<ToolHealth> {
+        return new TagLibAdapter().getToolHealth();
     }
 
     /**

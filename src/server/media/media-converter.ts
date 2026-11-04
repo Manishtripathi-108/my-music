@@ -5,7 +5,7 @@ import path from 'node:path';
 import 'server-only';
 
 import { serverEnv } from '@/config/env.server';
-import { clamp, parseFloatNumber, parseOptionalNumber } from '@/lib/number';
+import { clamp, parseFiniteNumber } from '@/lib/number';
 
 import { FFprobeAdapter } from './adapters/ffprobe.adapter';
 import { authorizeInputPath, authorizeOutputPath } from './path-security';
@@ -262,17 +262,17 @@ export class MediaConverter implements MediaConverterEngine {
             if (!key || !value) continue;
 
             if (key === 'out_time_us') {
-                const micros = parseOptionalNumber(value);
+                const micros = parseFiniteNumber(value);
                 if (micros !== undefined) {
                     currentTimeMicros = micros;
                 }
             } else if (key === 'speed') {
                 speed = value;
             } else if (key === 'fps') {
-                const parsedFps = parseOptionalNumber(value);
+                const parsedFps = parseFiniteNumber(value);
                 if (parsedFps !== undefined) fps = parsedFps;
             } else if (key === 'bitrate') {
-                const parsedKbps = parseFloatNumber(value.replace(/kbits\/s/i, '').trim());
+                const parsedKbps = parseFiniteNumber(value.replace(/kbits\/s/i, '').trim());
                 if (parsedKbps !== undefined) bitRateKbps = parsedKbps;
             }
         }

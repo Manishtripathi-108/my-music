@@ -11,6 +11,7 @@ import {
     positiveNumberSchema,
     textSchema,
 } from '../schema';
+import { parseFiniteInteger, parseFiniteNumber } from '../number';
 
 /**
  * Normalizes a property key for case-insensitive, punctuation-insensitive comparison.
@@ -21,17 +22,6 @@ export const compactKey = (key: string): string => key.toLowerCase().replace(/[^
 
 /** Determines value parsing, validation constraints, and TagLib serialization rules. */
 export type ValueKind = 'text' | 'freeText' | 'list' | 'positiveInteger' | 'positiveNumber' | 'number' | 'nonNegativeNumber' | 'gain';
-
-const DECIMAL_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
-const INTEGER_PATTERN = /^\d+$/;
-
-function parseFiniteNumber(value: string): number | undefined {
-    const normalized = value.trim();
-    if (!DECIMAL_PATTERN.test(normalized)) return undefined;
-
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : undefined;
-}
 
 export function parseFieldValue(kind: ValueKind, value: string[]): unknown | undefined {
     if (value.length === 0) return kind === 'list' ? [] : undefined;
@@ -47,11 +37,8 @@ export function parseFieldValue(kind: ValueKind, value: string[]): unknown | und
                 .join('\n');
 
         case 'positiveInteger': {
-            const trimmed = value[0].trim();
-            if (!INTEGER_PATTERN.test(trimmed)) return undefined;
-
-            const parsed = Number(trimmed);
-            return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+            const parsed = parseFiniteInteger(value[0].trim());
+            return parsed !== undefined && parsed > 0 ? parsed : undefined;
         }
 
         case 'positiveNumber': {

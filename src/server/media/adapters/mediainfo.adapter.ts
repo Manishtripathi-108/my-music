@@ -6,7 +6,7 @@ import 'server-only';
 
 import { serverEnv } from '@/config/env.server';
 import { parseBitrateMode } from '@/lib/media';
-import { parseOptionalNumber } from '@/lib/number';
+import { parseFiniteNumber } from '@/lib/number';
 
 import type { MediaInfoQC, QualityControlAdapter } from '../types';
 
@@ -96,14 +96,14 @@ export class MediaInfoAdapter implements QualityControlAdapter {
 
         const bitrateMode = parseBitrateMode(audioTrack.BitRate_Mode || generalTrack.BitRate_Mode);
         const format = String(audioTrack.Format || generalTrack.Format || 'unknown');
-        const overallBitrate = parseOptionalNumber(generalTrack.OverallBitRate || audioTrack.BitRate);
-        const maximumBitrate = parseOptionalNumber(audioTrack.BitRate_Maximum);
-        const bitDepth = parseOptionalNumber(audioTrack.BitDepth);
+        const overallBitrate = parseFiniteNumber(generalTrack.OverallBitRate || audioTrack.BitRate) || 0;
+        const maximumBitrate = parseFiniteNumber(audioTrack.BitRate_Maximum) || 0;
+        const bitDepth = parseFiniteNumber(audioTrack.BitDepth) || 0;
         const compressionMode = typeof audioTrack.Compression_Mode === 'string' ? audioTrack.Compression_Mode : undefined;
         const encodedLibrary = typeof audioTrack.Encoded_Library === 'string' ? audioTrack.Encoded_Library : undefined;
         const encodedLibrarySettings = typeof audioTrack.Encoded_Library_Settings === 'string' ? audioTrack.Encoded_Library_Settings : undefined;
-        const delay = parseOptionalNumber(audioTrack.Delay);
-        const padding = parseOptionalNumber(audioTrack.Padding);
+        const delay = parseFiniteNumber(audioTrack.Delay) || 0;
+        const padding = parseFiniteNumber(audioTrack.Padding) || 0;
 
         return {
             format,

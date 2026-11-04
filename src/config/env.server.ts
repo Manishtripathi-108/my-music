@@ -1,3 +1,4 @@
+import { splitDelimitedList } from '@/lib/format';
 import 'server-only';
 import { z } from 'zod';
 
@@ -10,12 +11,7 @@ const serverEnvSchema = z.object({
     ALLOWED_MEDIA_ROOTS: z
         .string()
         .min(1, 'ALLOWED_MEDIA_ROOTS cannot be empty')
-        .transform((val) =>
-            val
-                .split(/[;,]/)
-                .map((s) => s.trim())
-                .filter((s) => s.length > 0)
-        )
+        .transform((val) => splitDelimitedList(val))
         .refine((arr) => arr.length > 0, {
             message: 'At least one allowed media root must be configured in ALLOWED_MEDIA_ROOTS',
         }),

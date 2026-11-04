@@ -3,47 +3,30 @@
  * Client-safe and server-safe (zero Node dependencies).
  */
 
-/**
- * Parses an unknown value into a guaranteed finite number.
- * Returns `fallback` (defaults to 0) if the value is null, undefined, empty, NaN, or non-finite.
- *
- * @param value - Value to parse.
- * @param fallback - Fallback number if parsing fails. Default is 0.
- */
-export function parseNumber(value: unknown, fallback = 0): number {
-    if (value === null || value === undefined || value === '') {
-        return fallback;
-    }
-    const num = Number(value);
-    return Number.isFinite(num) ? num : fallback;
-}
+const DECIMAL_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+const INTEGER_PATTERN = /^\d+$/;
 
-/**
- * Parses an unknown value into an optional finite number.
- * Returns `undefined` if the value is null, undefined, empty, NaN, or non-finite.
- * Useful for optional technical specs where 0 is distinct from omitted/unknown.
- *
- * @param value - Value to parse.
- */
-export function parseOptionalNumber(value: unknown): number | undefined {
-    if (value === null || value === undefined || value === '') {
-        return undefined;
+export function parseFiniteNumber(value: unknown): number | undefined {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : undefined;
     }
-    const num = Number(value);
-    return Number.isFinite(num) ? num : undefined;
-}
 
-/**
- * Parses a floating-point number from an unknown value.
- *
- * @param value - Value to parse.
- */
-export function parseFloatNumber(value: unknown): number | undefined {
-    if (value === null || value === undefined || value === '') {
-        return undefined;
-    }
-    const parsed = Number.parseFloat(String(value));
+    if (typeof value !== 'string') return undefined;
+
+    const normalized = value.trim();
+    if (!DECIMAL_PATTERN.test(normalized)) return undefined;
+
+    const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export function parseFiniteInteger(value: unknown): number | undefined {
+    const normalized = String(value).trim();
+    if (!INTEGER_PATTERN.test(normalized)) return undefined;
+
+    const parsed = Number(normalized);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
 /**

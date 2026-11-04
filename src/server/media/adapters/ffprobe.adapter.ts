@@ -5,6 +5,7 @@ import 'server-only';
 
 import { serverEnv } from '@/config/env.server';
 import { isLosslessAudio } from '@/lib/media';
+import { parseFiniteNumber } from '@/lib/number';
 
 const execFileAsync = promisify(execFile);
 
@@ -63,16 +64,6 @@ export interface FFprobeStream {
     tags?: Record<string, string>;
 }
 
-const toNumber = (value?: string | number | null): number | undefined => {
-    if (value === undefined || value === null || value === '') {
-        return undefined;
-    }
-
-    const parsed = Number(value);
-
-    return Number.isFinite(parsed) ? parsed : undefined;
-};
-
 export class FFprobeAdapter {
     private readonly binaryPath: string;
 
@@ -109,14 +100,14 @@ export class FFprobeAdapter {
     }
 
     private normalizeMetadata(raw: FFprobeOutput) {
-        const formatDuration = toNumber(raw.format.duration);
+        const formatDuration = parseFiniteNumber(raw.format.duration);
 
         const format = {
             container: raw.format.format_name,
             containerLongName: raw.format.format_long_name,
             duration: formatDuration,
-            bitRate: toNumber(raw.format.bit_rate),
-            size: toNumber(raw.format.size) ?? 0,
+            bitRate: parseFiniteNumber(raw.format.bit_rate),
+            size: parseFiniteNumber(raw.format.size) ?? 0,
             streamCount: raw.format.nb_streams,
             probeScore: raw.format.probe_score,
         };
@@ -136,21 +127,21 @@ export class FFprobeAdapter {
                     profile: stream.profile,
 
                     sampleFormat: stream.sample_fmt,
-                    sampleRate: toNumber(stream.sample_rate),
+                    sampleRate: parseFiniteNumber(stream.sample_rate),
 
                     channels: stream.channels ?? 0,
                     channelLayout: stream.channel_layout,
 
                     bitsPerSample: stream.bits_per_sample ?? 0,
-                    bitsPerRawSample: toNumber(stream.bits_per_raw_sample),
-                    bitRate: toNumber(stream.bit_rate),
+                    bitsPerRawSample: parseFiniteNumber(stream.bits_per_raw_sample),
+                    bitRate: parseFiniteNumber(stream.bit_rate),
 
-                    duration: toNumber(stream.duration) ?? formatDuration,
+                    duration: parseFiniteNumber(stream.duration) ?? formatDuration,
                     isLossless: isLosslessAudio(codec),
                 };
             });
 
-        const coverArt = raw.streams
+        const coverArts = raw.streams
             .filter((stream) => stream.disposition?.attached_pic === 1)
             .map((stream) => ({
                 index: stream.index,
@@ -168,14 +159,14 @@ export class FFprobeAdapter {
             }));
 
         const hasAudio = audio.length > 0;
-        const hasCoverArt = coverArt.length > 0;
+        const hasCoverArt = coverArts.length > 0;
 
         return {
             ...format,
             isLossless: audio.some((stream) => stream.isLossless),
             hasAudio,
             hasCoverArt,
-            coverArt,
+            coverArts,
             audio,
         };
     }

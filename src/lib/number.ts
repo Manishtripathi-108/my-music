@@ -34,24 +34,6 @@ export function parseOptionalNumber(value: unknown): number | undefined {
 }
 
 /**
- * Parses an integer from an unknown value.
- * Handles fractional or split strings (e.g. "03/12" -> 3) commonly returned in audio metadata tags.
- *
- * @param value - Value to parse.
- */
-export function parseInteger(value: unknown): number | undefined {
-    if (value === null || value === undefined || value === '') {
-        return undefined;
-    }
-    const str = String(value).split('/')[0]?.trim();
-    if (!str) {
-        return undefined;
-    }
-    const parsed = Number.parseInt(str, 10);
-    return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-/**
  * Parses a floating-point number from an unknown value.
  *
  * @param value - Value to parse.

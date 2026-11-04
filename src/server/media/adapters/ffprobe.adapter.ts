@@ -5,80 +5,86 @@ import 'server-only';
 
 import { serverEnv } from '@/config/env.server';
 import { isLosslessAudio } from '@/lib/media';
-import { parseNumber } from '@/lib/number';
-
-import { type ToolHealth, evaluateToolHealth } from '../tool-inspector';
-import type { AudioProberAdapter, TechnicalAudioInfo } from '../types';
 
 const execFileAsync = promisify(execFile);
 
-const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 
-interface FFprobeStream {
+export type FFprobeCodecType = 'audio' | 'video' | 'subtitle' | 'data' | 'attachment' | 'unknown';
+
+export interface FFprobeOutput {
+    streams: FFprobeStream[];
+    format: {
+        format_name: string;
+        format_long_name?: string;
+
+        nb_streams: number;
+
+        duration?: string;
+        size?: string;
+        bit_rate?: string;
+        probe_score?: number;
+    };
+}
+
+export interface FFprobeStream {
+    index: number;
+    codec_type: FFprobeCodecType;
+
     codec_name?: string;
     codec_long_name?: string;
-    codec_type?: string;
-    duration?: string | number;
-    bit_rate?: string | number;
-    sample_rate?: string | number;
+    codec_tag_string?: string;
+    profile?: string;
+
+    // Audio properties
+    sample_fmt?: string;
+    sample_rate?: string;
     channels?: number;
     channel_layout?: string;
     bits_per_sample?: number;
-    bits_per_raw_sample?: string | number;
+    bits_per_raw_sample?: string;
+    bit_rate?: string;
+
+    // Video properties
+    width?: number;
+    height?: number;
+    sample_aspect_ratio?: string;
+    display_aspect_ratio?: string;
+
+    // Timing
+    duration?: string;
+
     disposition?: {
+        default?: number;
         attached_pic?: number;
     };
+
+    tags?: Record<string, string>;
 }
 
-interface FFprobeRawOutput {
-    streams?: FFprobeStream[];
-    format?: {
-        format_name?: string;
-        format_long_name?: string;
-        duration?: string | number;
-        bit_rate?: string | number;
-    };
-}
+const toNumber = (value?: string | number | null): number | undefined => {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
 
-function parseFFprobeVersion(output: string): string | null {
-    return output.match(/ffprobe version\s+([^\s,]+)/i)?.[1] ?? null;
-}
+    const parsed = Number(value);
 
-/**
- * FFprobe Technical Audio Stream Prober Adapter.
- * Inspects elementary audio streams, packet dispositions, and container attributes.
- */
-export class FFprobeAdapter implements AudioProberAdapter {
+    return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+export class FFprobeAdapter {
     private readonly binaryPath: string;
 
     constructor(binaryPath = serverEnv.FFPROBE_PATH) {
         this.binaryPath = binaryPath;
     }
 
-    /**
-     * Returns health diagnostics for this adapter instance.
-     */
-    public async getToolHealth(): Promise<ToolHealth> {
-        return evaluateToolHealth('ffprobe', this.binaryPath, ['-version'], parseFFprobeVersion, serverEnv.PROBING_ENGINE);
-    }
-
-    /**
-     * Static convenience accessor for health diagnostics.
-     */
-    public static async getToolHealth(): Promise<ToolHealth> {
-        return new FFprobeAdapter().getToolHealth();
-    }
-
-    /**
-     * Probes an audio file and returns normalized technical stream parameters.
-     *
-     * @param canonicalPath - Pre-authorized canonical absolute file path.
-     */
-    public async inspect(canonicalPath: string): Promise<TechnicalAudioInfo> {
-        const args = ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', canonicalPath];
+    public async inspect(canonicalPath: string) {
+        const args = ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', canonicalPath];
 
         let stdout: string;
+
         try {
             ({ stdout } = await execFileAsync(this.binaryPath, args, {
                 timeout: DEFAULT_TIMEOUT_MS,
@@ -86,57 +92,91 @@ export class FFprobeAdapter implements AudioProberAdapter {
                 windowsHide: true,
             }));
         } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error);
-            throw new Error(`FFprobe failed for "${path.basename(canonicalPath)}": ${msg}`);
+            const message = error instanceof Error ? error.message : String(error);
+
+            throw new Error(`FFprobe failed for "${path.basename(canonicalPath)}": ${message}`, { cause: error });
         }
 
+        let raw: FFprobeOutput;
+
         try {
-            const rawOutput = JSON.parse(stdout) as FFprobeRawOutput;
-            return this.normalizeMetadata(rawOutput);
+            raw = JSON.parse(stdout) as FFprobeOutput;
         } catch (error) {
             throw new Error(`FFprobe returned invalid JSON for "${path.basename(canonicalPath)}"`, { cause: error });
         }
+
+        return { ...this.normalizeMetadata(raw), raw };
     }
 
-    private normalizeMetadata(raw: FFprobeRawOutput): TechnicalAudioInfo {
-        const streams = raw.streams ?? [];
-        const format = raw.format ?? {};
+    private normalizeMetadata(raw: FFprobeOutput) {
+        const formatDuration = toNumber(raw.format.duration);
 
-        const audioStream = streams.find((stream) => stream.codec_type === 'audio') ?? ({} as FFprobeStream);
+        const format = {
+            container: raw.format.format_name,
+            containerLongName: raw.format.format_long_name,
+            duration: formatDuration,
+            bitRate: toNumber(raw.format.bit_rate),
+            size: toNumber(raw.format.size) ?? 0,
+            streamCount: raw.format.nb_streams,
+            probeScore: raw.format.probe_score,
+        };
 
-        const codec = (audioStream.codec_name ?? 'unknown').toLowerCase();
-        const codecLongName = audioStream.codec_long_name ?? codec.toUpperCase();
-        const containerFormat = format.format_name ?? 'unknown';
-        const containerLongName = format.format_long_name ?? containerFormat;
+        const audio = raw.streams
+            .filter((stream) => stream.codec_type === 'audio')
+            .map((stream) => {
+                const codec = stream.codec_name ?? 'unknown';
 
-        const duration = parseNumber(format.duration ?? audioStream.duration);
-        const bitrate = parseNumber(format.bit_rate ?? audioStream.bit_rate);
-        const sampleRate = parseNumber(audioStream.sample_rate);
-        const channels = parseNumber(audioStream.channels);
+                return {
+                    index: stream.index,
+                    default: stream.disposition?.default === 1,
 
-        let bitsPerSample = parseNumber(audioStream.bits_per_sample);
-        if (bitsPerSample <= 0) {
-            bitsPerSample = parseNumber(audioStream.bits_per_raw_sample);
-        }
+                    codec,
+                    codecLongName: stream.codec_long_name,
+                    codecTag: stream.codec_tag_string,
+                    profile: stream.profile,
 
-        const hasAttachedPicture = streams.some((stream) => Number(stream.disposition?.attached_pic) === 1);
+                    sampleFormat: stream.sample_fmt,
+                    sampleRate: toNumber(stream.sample_rate),
+
+                    channels: stream.channels ?? 0,
+                    channelLayout: stream.channel_layout,
+
+                    bitsPerSample: stream.bits_per_sample ?? 0,
+                    bitsPerRawSample: toNumber(stream.bits_per_raw_sample),
+                    bitRate: toNumber(stream.bit_rate),
+
+                    duration: toNumber(stream.duration) ?? formatDuration,
+                    isLossless: isLosslessAudio(codec),
+                };
+            });
+
+        const coverArt = raw.streams
+            .filter((stream) => stream.disposition?.attached_pic === 1)
+            .map((stream) => ({
+                index: stream.index,
+                type: stream.tags?.comment ?? 'unknown',
+
+                codec: stream.codec_name ?? 'unknown',
+                codecLongName: stream.codec_long_name,
+                profile: stream.profile,
+
+                width: stream.width ?? 0,
+                height: stream.height ?? 0,
+
+                aspectRatio: stream.sample_aspect_ratio,
+                displayAspectRatio: stream.display_aspect_ratio,
+            }));
+
+        const hasAudio = audio.length > 0;
+        const hasCoverArt = coverArt.length > 0;
 
         return {
-            codec,
-            codecLongName,
-            containerFormat,
-            containerLongName,
-            duration: Math.max(0, duration),
-            bitrate: Math.max(0, Math.trunc(bitrate)),
-            sampleRate: Math.max(0, Math.trunc(sampleRate)),
-            channels: Math.max(0, Math.trunc(channels)),
-            channelLayout: audioStream.channel_layout,
-            bitsPerSample: bitsPerSample > 0 ? Math.trunc(bitsPerSample) : undefined,
-            isLossless: isLosslessAudio(codec, containerFormat),
-            hasAttachedPicture,
-            streamCount: streams.length,
-            rawStreams: streams,
-            rawFormat: format,
+            ...format,
+            isLossless: audio.some((stream) => stream.isLossless),
+            hasAudio,
+            hasCoverArt,
+            coverArt,
+            audio,
         };
     }
 }

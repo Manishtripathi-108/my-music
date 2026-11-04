@@ -4,10 +4,8 @@ import path from 'node:path';
 import 'server-only';
 import { applyCoverArt, applyTags, clearPictures, readMetadata, readPictures } from 'taglib-wasm/simple';
 
-import { serverEnv } from '@/config/env.server';
 import type { AudioTags, WriteAudioTags } from '@/lib/media';
 
-import { type ToolHealth } from '../tool-inspector';
 import type { MetadataAdapter, RawPictureData, TagWriteOptions, TagWriteResult } from '../types';
 import { TagMapper } from './tag-mapper';
 
@@ -16,28 +14,6 @@ import { TagMapper } from './tag-mapper';
  * Preserves audio bitstreams bit-for-bit with atomic crash-safe writes.
  */
 export class TagLibAdapter implements MetadataAdapter {
-    /**
-     * Returns health diagnostics for this adapter instance.
-     */
-    public async getToolHealth(): Promise<ToolHealth> {
-        return {
-            configured: serverEnv.METADATA_ENGINE,
-            active: 'wasm',
-            implementations: {
-                native: { available: false, version: null, path: null },
-                wasm: { available: true },
-            },
-            status: 'healthy',
-        };
-    }
-
-    /**
-     * Static convenience accessor for health diagnostics.
-     */
-    public static async getToolHealth(): Promise<ToolHealth> {
-        return new TagLibAdapter().getToolHealth();
-    }
-
     /**
      * Reads all normalized tags and embedded cover art from an audio file.
      */

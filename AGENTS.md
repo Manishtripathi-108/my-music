@@ -23,13 +23,13 @@ This file defines where code lives. Follow it unless the user explicitly asks fo
 5. **Server Components by default.** Add `"use client"` only for state, effects, browser APIs, or event handlers, and only on the smallest leaf component.
 6. **The server enforces validation and authorization.** UI checks are presentation only.
 7. **Reuse before creating.** Search for an existing module first. No empty folders, no speculative abstractions, no new pattern for a single task.
-8. **Verify, don't assume.** Check Next.js APIs against `node_modules/next/dist/docs/`, and check the DBMS, ORM, and library versions against the project's `package.json`, lockfile, and existing code before relying on them.
-9. **API and Bruno synchronization.** Whenever you change, add, or remove route files (`src/app/api/...`), always update the corresponding Bruno request files in `bruno/` to match the exact HTTP methods, URLs, request schemas, response structures, and assertions.
+8. **Verify, don't assume.** Check Next.js APIs against `node_modules/next/dist/docs/`. Check the DBMS, ORM, and library versions against `package.json`, the lockfile, and existing code before relying on them.
+9. **Keep the API and the Bruno collection in sync.** Any change to `src/app/api/**` updates `bruno/` in the same change (see [Bruno sync](#bruno-sync-mandatory)).
 
 ## Scope and boundaries
 
 - **Stay inside this project.** Do not read, modify, create, delete, or rename files outside the project root (other repos, home directory, system configuration, unrelated projects) without asking first. Exception: read-only lookup of installed dependency docs (e.g. `node_modules/next/dist/docs/`), even when hoisted above the app directory.
-- **Keep changes local.** No unrelated refactors, moves, renames, or reformatting during a task. No new dependencies, integrations, or top-level folders without approval.
+- **Keep changes local.** No unrelated refactors, moves, renames, or reformatting. No new dependencies, integrations, or top-level folders without approval.
 - **Never test against real user data.** Do not run scans, tag writes, conversions, or migrations against the user's real media library or any database other than the project's dev/test database. Use copies or fixtures inside the project unless the user explicitly authorizes otherwise.
 
 ## Folder structure
@@ -38,6 +38,7 @@ This file defines where code lives. Follow it unless the user explicitly asks fo
 project-root/
 ├── public/                       # static assets only
 ├── e2e/                          # end-to-end tests for real user flows
+├── bruno/                        # Bruno API collection (kept in sync with src/app/api)
 ├── cache/                        # runtime caches (e.g. cache/art/); gitignored
 ├── src/
 │   ├── app/                      # ROUTING + COMPOSITION
@@ -79,7 +80,7 @@ project-root/
 ```
 
 - Every folder is optional. Create a folder only when it will hold files.
-- Allowed at the root without approval: tool-mandated folders (`prisma/`, `drizzle/`, `.github/`, `scripts/`) and `cache/`. Any other new top-level folder needs approval.
+- Allowed at the root without approval: `bruno/`, `e2e/`, `cache/`, and tool-mandated folders (`prisma/`, `drizzle/`, `.github/`, `scripts/`). Any other new top-level folder needs approval.
 - `src/app/page.tsx` and `src/app/(group)/page.tsx` both resolve to `/` and collide. Keep only one.
 
 ## Where does it go
@@ -95,7 +96,8 @@ project-root/
 | Header, footer, sidebar | `src/components/layout` |
 | Generic provider (theme, query) | `src/components/providers` |
 | Provider that depends on a feature (session) | that feature's `components/` |
-| Client hook shared across features / used by one feature | `src/hooks` / `src/features/<feature>/hooks` |
+| Client hook shared across features | `src/hooks` |
+| Client hook used by one feature | `src/features/<feature>/hooks` |
 | Generic utility (cn, formatDate, logger) | `src/lib` |
 | DB client and schema, email, storage, queue, auth setup | `src/server` |
 | Typed env, site config, route constants | `src/config` |
@@ -105,8 +107,8 @@ project-root/
 Layer boundaries:
 
 - **`components/ui`** knows no business domain (`Table` yes, `UserTable` no). **`common`, `layout`, `providers`** are app-wide only; if one feature uses it, it belongs in that feature.
-- **`lib`** is small and generic. If a utility knows about orders, users, or billing, it belongs in that feature.
-- **`server`** holds infrastructure shared by 2+ features. No feature business rules; never imported by Client Components.
+- **`lib`** is small and generic. A utility that knows about orders, users, or billing belongs in that feature.
+- **`server`** holds infrastructure shared by 2+ features. No feature business rules. Never imported by Client Components.
 - **`types`** holds only genuinely cross-cutting types. Do not use it to avoid deciding which feature owns a type.
 
 ## Dependency rules
@@ -122,6 +124,7 @@ Layer boundaries:
 | `config` | types | everything else |
 | `types` | nothing | all application layers |
 
+- The `server` row applies to server-side files only. A feature's client files (components, hooks) never import `src/server` or the feature's own `queries/`, `services/`, or `repositories/`.
 - Feature-to-feature imports go through the other feature's `index.ts` (client-safe) or `server.ts` (server-only). No deep imports into its internals.
 - No circular dependencies. When two features need the same capability, extract a proper shared module.
 - Use the `@/` path alias. No long relative paths like `../../../`.
@@ -154,7 +157,7 @@ Public API of a feature:
 
 - Keep `"use client"` at the leaf. Pass server-rendered content down as `children` or props. Props crossing the boundary must be serializable.
 - `import "server-only"` is required in `src/server/**`, `features/*/{queries,services,repositories}/**`, every `server.ts`, and `config/env.server.ts`. Pure type-only files are exempt (types emit no runtime code).
-- Environment: `config/env.server.ts` (server-only, validated) and `config/env.client.ts` (`NEXT_PUBLIC_*` only). Read `process.env` only in `src/config`, including `NODE_ENV` and the engine switches; expose typed values (e.g. `isProduction`) from there.
+- Environment: `config/env.server.ts` (server-only, validated) and `config/env.client.ts` (`NEXT_PUBLIC_*` only). Read `process.env` only in `src/config`, including `NODE_ENV` and the engine switches, and expose typed values (e.g. `isProduction`) from there. Reference each `NEXT_PUBLIC_*` variable by its literal name; dynamic lookups are not inlined into the client bundle.
 - Client writes go through Server Actions. Use Route Handlers only when a real HTTP endpoint is needed: streaming or binary delivery, long-running jobs the client polls, webhooks, external clients, or an existing REST endpoint. Never call your own API routes from server code.
 - Prefer server state and URL state (search params). Use client state libraries only for genuinely shared client state. Do not mirror server data into client stores.
 
@@ -173,13 +176,16 @@ Public API of a feature:
 - **Route Handlers:** one `try/catch` whose `catch` only calls `handleRouteError(error, fallbackMessage)`. Never branch on `result.success`. The central handler maps domain errors, Zod errors, syntax errors, and unknown errors to an `ApiResponse<T>` with the right status. Map by error class or code, never by message text.
 - **Server Actions** are the UI boundary: catch expected domain errors and return a typed result whose failure branch carries a stable error code and field errors, not a message string. Let unexpected errors propagate to `error.tsx`.
 - Use `try/catch` elsewhere only to add context, recover, convert an error, or return a safe result.
-- Errors in the UI: `error.tsx` per segment, `global-error.tsx` for the root fallback, `not-found.tsx` for missing content.
+- UI errors: `error.tsx` per segment, `global-error.tsx` for the root fallback, `not-found.tsx` for missing content.
 
 ## Routes and API handlers
 
 - Route groups only when they own a layout or a clear section, not to tidy the tree.
 - Route Handlers do HTTP only: method handling, parse input, authenticate/authorize, call feature logic, return response.
-- **Bruno Collection Sync (MANDATORY)**: Whenever route files are created, modified, or deleted (`src/app/api/...`), you MUST immediately update, add, or delete the corresponding Bruno request files in `bruno/` to keep the API collection in exact parity with schemas, HTTP methods, route URLs, request payloads, response structures, and status assertions.
+
+### Bruno sync (mandatory)
+
+When a route file under `src/app/api/` is created, modified, or deleted, update, add, or delete the matching request file in `bruno/` in the same change. The collection must match the route exactly: HTTP method, URL, request payload and schema, response structure, and status assertions.
 
 ### Response envelope
 
@@ -278,13 +284,13 @@ The media subsystem is three decoupled engines. Native binaries are the default;
 ### Probing (ffprobe + MediaInfo)
 
 - `ffprobe` is the primary prober: codec, container, duration, bitrate, sample rate, channels, channel layout, attached-picture dispositions. Concurrency is bounded (default `MAX_CONCURRENCY = 8`).
-- MediaInfo supplements it where `ffprobe` is weak: bitrate mode (CBR/VBR), bit depth, and encoder library/settings and gapless-related header details. Confirm field names against real MediaInfo output on corpus files.
+- MediaInfo supplements it where `ffprobe` is weak: bitrate mode (CBR/VBR), bit depth, encoder library/settings, and gapless-related header details. Confirm field names against real MediaInfo output on corpus files.
 - `mediainfo.js` (WASM) replaces native probing when binaries cannot run (restricted sandbox) or the user selects it.
 - Loudness (EBU R128 / ITU-R BS.1770) is not a probing field: measure it on demand with FFmpeg's `ebur128` filter, never during bulk scans.
 
 ### Conversion (FFmpeg, LGPL)
 
-- Verify the native binary is an LGPL build: the `configuration:` line of `ffmpeg -version` must contain neither `--enable-gpl` nor `--enable-nonfree`.
+- Verify the native binary is an LGPL build: the `configuration:` line of `ffmpeg -version` must contain neither `--enable-gpl` nor `--enable-nonfree`. Also confirm the encoders and filters below exist in that build (`ffmpeg -hide_banner -encoders`, `-filters`); a minimal build may lack `libsoxr`, `libopus`, or `libmp3lame`.
 - Encoders: AAC via native `aac` (or `aac_mf` on Windows; never `libfdk_aac` unless the user configures an in-house, non-redistributed binary); Opus via `libopus`; MP3 via `libmp3lame`; FLAC and ALAC via native encoders; PCM via `pcm_s16le`, `pcm_s24le`, `pcm_s32le`, `pcm_f32le`.
 - Resample with SoX: `-af "aresample=resampler=soxr:precision=28:cutoff=0.99"`.
 - When reducing bit depth, dither: `-af "aresample=dither_method=triangular"` (or `lipshitz`).
@@ -301,22 +307,34 @@ The media subsystem is three decoupled engines. Native binaries are the default;
 
 ## Realistic UI design and animation standards
 
-Every component, interaction, animation, and visual effect must feel grounded in real-world physics and human perception. Treat realistic motion, natural interaction feedback, and physically believable design as core project principles, not optional polish. Apply them to all new components, refactors, UI updates, and animation changes.
+Every component, interaction, animation, and visual effect must feel grounded in real-world physics and human perception. Treat this as a core principle, not polish, and apply it to all new components, refactors, UI updates, and animation changes.
 
-### Animation requirements
+### Motion
 
-1. **Natural motion:** Use professional easing curves, controlled acceleration, and smooth deceleration (`cubic-bezier(0.16, 1, 0.3, 1)`). Make movement feel purposeful rather than robotic or mechanical.
-2. **Physical feedback:** Model realistic physical properties such as weight, momentum, friction, spring tension, and inertia. Buttons should feel pressed when clicked, switches should respond like physical controls, and panels should move with a clear sense of mass and direction.
-3. **Professional button interactions:** Ban awkward floating transforms (`hover:-translate-y-*`), excessive scaling, abrupt movement, and generic hover effects. Use subtle changes in depth, scale (`active:scale-[0.985]`), shadow, optical illumination (`hover:brightness-[1.03]`), and inset compression (`active:shadow-inner active:inset-shadow-xs`) to create convincing hover, active, focus, and release states.
-4. **Context-aware animations:** Match each animation to the component and the action. Menus should open and close with natural motion. Dialogs should enter and exit with spatial continuity. Drawers should slide along their physical anchor edge. Loading indicators, notifications, transitions, and scrolling effects should each have appropriate mass and motion.
-5. **Consistent visual quality:** Keep animations coherent across the entire application. Use consistent timing (150ms-250ms for micro-interactions), easing, motion distance, and interaction feedback. Avoid excessive motion, distracting effects, and animations that add no value.
-6. **Performance and accessibility:** Keep animations fluid, responsive, and GPU-accelerated. Respect the user's reduced motion preference (`prefers-reduced-motion: reduce`). Preserve keyboard navigation, visible focus states (`focus-visible:ring-2`), and clear feedback for every interaction.
+- **Natural motion:** controlled acceleration and smooth deceleration with `cubic-bezier(0.16, 1, 0.3, 1)`. Movement should feel purposeful, never robotic.
+- **Physical feedback:** model weight, momentum, friction, spring tension, and inertia. Buttons feel pressed, switches respond like physical controls, panels move with a clear sense of mass and direction.
+- **Context-aware:** match each animation to the component and action. Menus open and close naturally, dialogs enter and exit with spatial continuity, drawers slide along their anchor edge.
+- **Consistent:** one timing scale (150ms to 250ms for micro-interactions), one easing, one motion distance across the app. No excessive or purposeless motion.
+- **Performant and accessible:** GPU-accelerated properties (`transform`, `opacity`). Respect `prefers-reduced-motion: reduce`. Preserve keyboard navigation and clear feedback for every interaction.
 
-### Native squircles and curvature standards
+### Button and control states
 
-- **Always use squircle for round objects:** Use the modern `corner-shape: squircle` property in CSS.
-- **Why squircles matter:** A true squircle uses a mathematical superellipse curve (`superellipse(2)`) rather than traditional circular arcs (`border-radius`), which cause a harsh curvature transition (a visual "speed bump") where the flat edge meets the curve. Squircles provide continuous curvature continuity (G2 continuity) identical to high-end industrial hardware and OS icon geometry.
-- **Application:** Apply `corner-shape: squircle` globally and on all rounded containers, cards, buttons, badges, avatars, dialogs, inputs, and pills alongside their `border-radius`.
+| State | Treatment |
+| --- | --- |
+| Hover | Subtle optical illumination: `hover:brightness-[1.03]` |
+| Active (pressed) | Slight compression: `active:scale-[0.985] active:shadow-inner active:inset-shadow-xs` |
+| Focus | Always visible: `focus-visible:ring-2` |
+| Release | Spring back with the standard easing |
+
+Banned: floating transforms (`hover:-translate-y-*`), excessive scaling, abrupt movement, generic hover effects.
+
+Define repeated class strings once (a shared primitive in `components/ui` or a utility in `globals.css`) instead of copying them into each component.
+
+### Squircles
+
+- Use `corner-shape: squircle` on all rounded elements: containers, cards, buttons, badges, avatars, dialogs, inputs, and pills. Apply it globally, alongside `border-radius`.
+- `border-radius` is still required. `corner-shape` changes the curve, not the radius, and browsers without support fall back to ordinary circular corners.
+- Why: a squircle is a superellipse (`superellipse(2)`), so curvature changes continuously where the flat edge meets the corner (G2 continuity). Circular arcs create a visible "speed bump" at that joint.
 
 ## Naming and code clarity
 
@@ -413,7 +431,6 @@ Do not ask about placements this file already answers.
 - [ ] Imports follow the dependency table; no cycles or deep cross-feature imports.
 - [ ] The diff contains no unrelated changes, new dependencies, or duplicated logic.
 - [ ] Tests are added or updated for changed behavior.
-- [ ] Bruno API collection files (`bruno/`) are updated to match any modified or added route handlers.
-- [ ] Animations and interactive controls follow realistic physical motion standards (no awkward hover translates; subtle press compression and spring release).
-- [ ] Round objects and curved elements enforce native squircle geometry (`corner-shape: squircle`).
+- [ ] `bruno/` matches every added, changed, or removed route handler.
+- [ ] Interactive controls and animations follow the motion standards; rounded elements use `corner-shape: squircle`.
 - [ ] The project's lint, typecheck, and test scripts (see `package.json`) pass.

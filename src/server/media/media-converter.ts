@@ -9,7 +9,6 @@ import { clamp, parseFloatNumber, parseOptionalNumber } from '@/lib/number';
 
 import { FFprobeAdapter } from './adapters/ffprobe.adapter';
 import { authorizeInputPath, authorizeOutputPath } from './path-security';
-import { type ToolHealth, evaluateToolHealth } from './tool-inspector';
 import type { ConversionOptions, ConversionProgress, ConversionProgressCallback, ConversionResult, MediaConverterEngine } from './types';
 
 /**
@@ -24,26 +23,6 @@ export class MediaConverter implements MediaConverterEngine {
     constructor(ffmpegPath = serverEnv.FFMPEG_PATH, prober = new FFprobeAdapter()) {
         this.ffmpegPath = ffmpegPath;
         this.prober = prober;
-    }
-
-    /**
-     * Returns health diagnostics for this converter instance.
-     */
-    public async getToolHealth(): Promise<ToolHealth> {
-        return evaluateToolHealth(
-            'ffmpeg',
-            this.ffmpegPath,
-            ['-version'],
-            (output) => output.match(/ffmpeg version\s+([^\s,]+)/i)?.[1] ?? null,
-            serverEnv.CONVERSION_ENGINE
-        );
-    }
-
-    /**
-     * Static convenience accessor for health diagnostics.
-     */
-    public static async getToolHealth(): Promise<ToolHealth> {
-        return new MediaConverter().getToolHealth();
     }
 
     /**

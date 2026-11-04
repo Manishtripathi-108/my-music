@@ -1,5 +1,4 @@
 import type { AudioTags, BitrateMode, ConversionTargetFormat, WriteAudioTags } from '@/lib/media';
-import type { ToolHealth } from './tool-inspector';
 
 /* -------------------------- Artwork Domain Models ------------------------- */
 
@@ -141,15 +140,10 @@ export interface ConversionResult {
     duration: number;
 }
 
-/* ---------------------- Adapter & Health Interfaces ----------------------- */
-
-/** Common contract for components that report engine and tool health diagnostics. */
-export interface ToolHealthProvider {
-    getToolHealth(): Promise<ToolHealth>;
-}
+/* --------------------------- Adapter Interfaces --------------------------- */
 
 /** Audio Metadata Adapter interface for reading and writing audio tags and artwork. */
-export interface MetadataAdapter extends ToolHealthProvider {
+export interface MetadataAdapter {
     readTags(canonicalPath: string): Promise<{
         tags: AudioTags;
         raw: Record<string, unknown>;
@@ -161,17 +155,17 @@ export interface MetadataAdapter extends ToolHealthProvider {
 }
 
 /** Audio Prober Adapter interface for stream parameters and container format inspection. */
-export interface AudioProberAdapter extends ToolHealthProvider {
+export interface AudioProberAdapter {
     inspect(canonicalPath: string): Promise<TechnicalAudioInfo>;
 }
 
 /** Quality-Control Prober Adapter interface for forensic media and bitrate metrics. */
-export interface QualityControlAdapter extends ToolHealthProvider {
+export interface QualityControlAdapter {
     inspect(canonicalPath: string): Promise<MediaInfoQC>;
 }
 
 /** Media Converter Engine interface for audio transcoding and DSP operations. */
-export interface MediaConverterEngine extends ToolHealthProvider {
+export interface MediaConverterEngine {
     convert(
         inputPath: string,
         options: ConversionOptions,

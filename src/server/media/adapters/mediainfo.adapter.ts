@@ -8,14 +8,9 @@ import { serverEnv } from '@/config/env.server';
 import { parseBitrateMode } from '@/lib/media';
 import { parseOptionalNumber } from '@/lib/number';
 
-import { type ToolHealth, evaluateToolHealth } from '../tool-inspector';
 import type { MediaInfoQC, QualityControlAdapter } from '../types';
 
 const execFileAsync = promisify(execFile);
-
-function parseMediaInfoVersion(output: string): string | null {
-    return output.match(/MediaInfoLib\s*-\s*v?([^\s\r\n]+)/i)?.[1] ?? output.match(/\bv?(\d+\.\d+(?:\.\d+)?)\b/)?.[1] ?? null;
-}
 
 // Module-level pooled WASM factory promise
 let wasmInstancePromise: Promise<MediaInfo<'object'>> | null = null;
@@ -39,14 +34,6 @@ export class MediaInfoAdapter implements QualityControlAdapter {
 
     constructor(binaryPath = serverEnv.MEDIAINFO_PATH) {
         this.binaryPath = binaryPath;
-    }
-
-    public async getToolHealth(): Promise<ToolHealth> {
-        return evaluateToolHealth('mediaInfo', this.binaryPath, ['--version'], parseMediaInfoVersion, serverEnv.PROBING_ENGINE);
-    }
-
-    public static async getToolHealth(): Promise<ToolHealth> {
-        return new MediaInfoAdapter().getToolHealth();
     }
 
     public async inspect(canonicalPath: string): Promise<MediaInfoQC> {

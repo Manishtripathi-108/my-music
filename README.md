@@ -51,10 +51,8 @@ src/
 │   └── media/                # Media subsystem execution engines:
 │       ├── adapters/         # Low-level binary & binding adapters (TagLib, FFprobe, MediaInfo)
 │       ├── media-converter.ts# Transcoding engine with SoX DSP resampling and dithering
-│       ├── media-diagnostics.ts # Deep binary inspection & health diagnostics
 │       ├── metadata-coordinator.ts # High-level TagLib/FFprobe/MediaInfo orchestrator
 │       ├── path-security.ts  # Directory confinement & symlink traversal protection
-│       ├── tool-inspector.ts # Binary version and LGPL license validator
 │       └── types.ts          # Server-only technical types and data models
 │
 ├── config/                   # APPLICATION CONFIGURATION
@@ -92,7 +90,6 @@ flowchart TD
     end
 
     subgraph RouteLayer["Presentation & Routing (src/app/api/media)"]
-        R_Health["/api/health & /api/health/media\n(GET)"]
         R_Meta["/api/media/metadata\n(GET / POST batch)"]
         R_Tech["/api/media/technical\n(GET)"]
         R_Tags["/api/media/tags\n(GET / PATCH / POST batch)"]
@@ -149,7 +146,6 @@ flowchart TD
 | **`MediaInfoAdapter`**    | `src/server/media/adapters/mediainfo.adapter.ts` | **QC Quality Inspector**: Supplements FFprobe with deep analysis: exact CBR/VBR bitrate mode, bit depth, encoder library strings, and gapless audio playback parameters.                                                                            |
 | **`MediaConverter`**      | `src/server/media/media-converter.ts`            | **Audiophile Transcoding Engine**: Spawns LGPL-compliant FFmpeg with SoX 28-bit precision resampling, triangular/lipshitz dithering, ITU-R BS.775 stereo downmixing, progress tracking via pipe, and atomic rename writes.                          |
 | **`PathSecurity`**        | `src/server/media/path-security.ts`              | **Filesystem Security Guard**: Validates all incoming and outgoing file paths against `ALLOWED_MEDIA_ROOTS`. Resolves symlinks using `fs.realpath` and prevents path traversal attacks.                                                             |
-| **`ToolInspector`**       | `src/server/media/tool-inspector.ts`             | **Runtime Health & Compliance**: Inspects installed binaries, verifies versions, checks LGPL licensing flags (`--enable-gpl` / `--enable-nonfree` exclusion), and tests engine capabilities.                                                        |
 
 ---
 
@@ -485,7 +481,6 @@ flowchart TD
 | **Corrupted Audio Header**             | `TagLib` / `FFprobe` parser        | Process returns non-zero error. Caught in coordinator; logs error and isolates failure.           | In single: `500 Internal Error`; In batch: recorded in `failures[]`. |
 | **Padding Exceeded on Write**          | `TagLibAdapter`                    | Automatically writes to temporary sibling file (`.<name>.tmp_<uuid>`) and performs atomic rename. | `200 OK` (Tag write succeeds seamlessly).                            |
 | **Conversion Process Crash / Timeout** | `MediaConverter`                   | Monitors exit signals, removes any incomplete temporary output file, and rejects execution.       | `500 Internal Error` (`ConversionError`).                            |
-| **LGPL Non-Compliance**                | `ToolInspector`                    | Checks `ffmpeg -version` for `--enable-gpl` or `--enable-nonfree` flags.                          | Warning logged; reported via `/api/health/media`.                    |
 | **Missing Artwork**                    | `MetadataCoordinator`              | Fails gracefully if no embedded cover art picture blocks exist.                                   | `404 Not Found` on artwork API; `artwork: null` on metadata read.    |
 | **Process Termination / Shutdown**     | `process.on('SIGINT' / 'SIGTERM')` | Kills active FFmpeg child processes (`q` → `SIGTERM` → `SIGKILL`) to prevent orphaned tasks.      | Clean OS process exit.                                               |
 
@@ -575,62 +570,7 @@ All JSON endpoints return a standardized `ApiResponse<T>` envelope:
 
 ---
 
-### 1. Health & Engine Diagnostics
-
-#### `GET /api/health`
-
-Fast, non-blocking process liveness probe.
-
-- **Example Response (200 OK)**:
-    ```json
-    {
-        "success": true,
-        "data": {
-            "status": "ok",
-            "uptime": 142.5,
-            "timestamp": "2026-10-28T02:00:00.000Z"
-        }
-    }
-    ```
-
-#### `GET /api/health/media`
-
-Deep diagnostic check of TagLib, FFprobe, MediaInfo, and FFmpeg binaries, verifying installation paths, versions, engine health, and LGPL licensing compliance.
-
-- **Example Response (200 OK)**:
-    ```json
-    {
-        "success": true,
-        "data": {
-            "status": "healthy",
-            "timestamp": "2026-10-28T02:00:00.000Z",
-            "engines": {
-                "metadata": {
-                    "status": "healthy",
-                    "engine": "native",
-                    "provider": "node-taglib2 (native N-API)",
-                    "version": "2.9.6",
-                    "features": { "read": true, "write": true, "artwork": true, "inPlacePadding": true }
-                },
-                "probing": {
-                    "status": "healthy",
-                    "ffprobe": { "available": true, "version": "7.1" },
-                    "mediaInfo": { "available": true, "version": "24.12" }
-                },
-                "conversion": {
-                    "status": "healthy",
-                    "version": "7.1",
-                    "isLgplCompliant": true,
-                    "hasSoxr": true
-                }
-            }
-        }
-    }
-    ```
-
----
-
-### 2. Audio Metadata APIs
+### 1. Audio Metadata APIs
 
 #### `GET /api/media/metadata`
 
@@ -946,7 +886,6 @@ curl -X POST "http://localhost:3000/api/media/convert" \
 
 The repository includes a complete [Bruno](https://www.usebruno.com/) collection under [`bruno/`](file:///e:/Code/Next/my-music/bruno/) containing 29 test requests covering:
 
-- **Health**: Liveness, readiness, and media engine diagnostics
 - **Metadata**: Single and batch inspection
 - **Tags**: Reading, single PATCH updates, and batch updates
 - **Conversion**: FLAC, MP3 with SoX dithering, Opus, and validation failure tests

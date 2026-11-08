@@ -28,8 +28,8 @@ runtime:
         test("should return 200 with FFprobe technical specs", function() {
           expect(res.getStatus()).to.equal(200);
           expect(res.getBody().success).to.be.true;
-          expect(res.getBody().data.technical.container).to.be.a('string');
-          expect(res.getBody().data.technical.audio).to.be.an('array');
+          expect(res.getBody().data.technical.codec).to.be.a('string');
+          expect(res.getBody().data.technical.sampleRate).to.be.a('number');
         });
   assertions:
     - expression: res.status
@@ -40,9 +40,11 @@ runtime:
       value: "true"
     - expression: res.body.data.technical
       operator: isDefined
-    - expression: res.body.data.technical.container
+    - expression: res.body.data.technical.codec
       operator: isDefined
-    - expression: res.body.data.technical.audio
+    - expression: res.body.data.technical.sampleRate
+      operator: isDefined
+    - expression: res.body.data.technical.channels
       operator: isDefined
     - expression: res.body.data.technical.duration
       operator: isDefined

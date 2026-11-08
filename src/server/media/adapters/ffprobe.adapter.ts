@@ -7,14 +7,7 @@ import { serverEnv } from '@/config/env.server';
 import { isLosslessAudio } from '@/lib/media';
 import { parseFiniteInteger, parseFiniteNumber, parseString } from '@/lib/number';
 
-import type {
-    AudioStreamInfo,
-    CoverArtInfo,
-    FFprobeAudioStream,
-    FFprobeCoverArt,
-    FFprobeInspectionResult,
-    FFprobeNormalizedResult,
-} from '../types';
+import type { AudioStreamInfo, CoverArtInfo, FFprobeAudioStream, FFprobeCoverArt, FFprobeInspectionResult, FFprobeNormalizedResult } from '../types';
 
 const execFileAsync = promisify(execFile);
 
@@ -80,7 +73,7 @@ export class FFprobeAdapter {
         this.binaryPath = binaryPath;
     }
 
-    private normalizeMetadata(raw: FFprobeRawOutput): FFprobeNormalizedResult {
+    public normalizeResult(raw: FFprobeRawOutput): FFprobeNormalizedResult {
         const rawFormat = raw.format ?? {};
         const rawStreams = raw.streams ?? [];
         const formatDuration = parseFiniteNumber(rawFormat.duration);
@@ -186,7 +179,7 @@ export class FFprobeAdapter {
             });
 
             const raw = JSON.parse(stdout) as FFprobeRawOutput;
-            return { ...this.normalizeMetadata(raw), raw };
+            return { ...this.normalizeResult(raw), raw };
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
 

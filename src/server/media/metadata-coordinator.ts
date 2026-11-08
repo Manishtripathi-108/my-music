@@ -88,7 +88,16 @@ export class MetadataCoordinator {
             includeQC ? this.mediaInfo.inspect(canonicalPath).catch(() => null) : Promise.resolve(null),
         ]);
 
-        if (technical.channels === 0 && technical.sampleRate === 0 && technical.duration === 0) {
+        const primaryAudio = technical.audio[0];
+        const hasNoAudio = !technical.hasAudio || !primaryAudio;
+        const isCorruptAudio = Boolean(
+            primaryAudio &&
+            primaryAudio.channels === 0 &&
+            primaryAudio.sampleRate === 0 &&
+            (technical.duration === 0 || technical.duration === undefined)
+        );
+
+        if (hasNoAudio || isCorruptAudio) {
             throw new BadRequestError(`File "${path.basename(canonicalPath)}" is corrupt or contains no valid audio stream`);
         }
 
@@ -111,8 +120,8 @@ export class MetadataCoordinator {
             qc,
             artwork,
             rawTagMetadata: options.includeRawPayload ? tagResult.raw : undefined,
-            rawFFprobeMetadata: options.includeRawPayload ? technical.rawFormat : undefined,
-            rawMediaInfoMetadata: options.includeRawPayload ? qc?.rawTracks : undefined,
+            rawFFprobeMetadata: options.includeRawPayload ? technical.raw : undefined,
+            rawMediaInfoMetadata: options.includeRawPayload ? qc?.raw : undefined,
         };
     }
 

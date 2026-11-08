@@ -15,13 +15,11 @@ const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 export type FFprobeCodecType = 'audio' | 'video' | 'subtitle' | 'data' | 'attachment' | 'unknown';
 
 export interface FFprobeRawOutput {
-    streams: FFprobeStream[];
-    format: {
-        format_name: string;
+    streams?: FFprobeStream[];
+    format?: {
+        format_name?: string;
         format_long_name?: string;
-
-        nb_streams: number;
-
+        nb_streams?: number;
         duration?: string;
         size?: string;
         bit_rate?: string;
@@ -64,6 +62,64 @@ export interface FFprobeStream {
     tags?: Record<string, string>;
 }
 
+export interface FFprobeAudioStream {
+    index: number;
+    default: boolean;
+
+    codec: string;
+    codecLongName?: string;
+    codecTag?: string;
+    profile?: string;
+
+    sampleFormat?: string;
+    sampleRate?: number;
+
+    channels: number;
+    channelLayout?: string;
+
+    bitsPerSample: number;
+    bitsPerRawSample?: number;
+    bitRate?: number;
+
+    duration?: number;
+    isLossless: boolean;
+}
+
+export interface FFprobeCoverArt {
+    index: number;
+    type: string;
+
+    codec: string;
+    codecLongName?: string;
+    profile?: string;
+
+    width: number;
+    height: number;
+
+    aspectRatio?: number;
+    sampleAspectRatio?: string;
+    displayAspectRatio?: string;
+}
+
+export interface FFprobeNormalizedResult {
+    container: string;
+    containerLongName?: string;
+    duration?: number;
+    bitRate?: number;
+    size: number;
+    streamCount: number;
+    probeScore?: number;
+    isLossless: boolean;
+    hasAudio: boolean;
+    hasCoverArt: boolean;
+    coverArts: FFprobeCoverArt[];
+    audio: FFprobeAudioStream[];
+}
+
+export interface FFprobeInspectionResult extends FFprobeNormalizedResult {
+    raw: FFprobeRawOutput;
+}
+
 export class FFprobeAdapter {
     private readonly binaryPath: string;
 
@@ -71,20 +127,22 @@ export class FFprobeAdapter {
         this.binaryPath = binaryPath;
     }
 
-    private normalizeMetadata(raw: FFprobeRawOutput) {
-        const formatDuration = parseFiniteNumber(raw.format.duration);
+    private normalizeResult(raw: FFprobeRawOutput): FFprobeNormalizedResult {
+        const rawFormat = raw.format ?? {};
+        const rawStreams = raw.streams ?? [];
+        const formatDuration = parseFiniteNumber(rawFormat.duration);
 
         const format = {
-            container: raw.format.format_name,
-            containerLongName: raw.format.format_long_name,
+            container: rawFormat.format_name ?? 'unknown',
+            containerLongName: rawFormat.format_long_name,
             duration: formatDuration,
-            bitRate: parseFiniteNumber(raw.format.bit_rate),
-            size: parseFiniteNumber(raw.format.size) ?? 0,
-            streamCount: raw.format.nb_streams,
-            probeScore: raw.format.probe_score,
+            bitRate: parseFiniteNumber(rawFormat.bit_rate),
+            size: parseFiniteNumber(rawFormat.size) ?? 0,
+            streamCount: rawFormat.nb_streams ?? rawStreams.length,
+            probeScore: rawFormat.probe_score,
         };
 
-        const audio = raw.streams
+        const audio: FFprobeAudioStream[] = rawStreams
             .filter((stream) => stream.codec_type === 'audio')
             .map((stream) => {
                 const codec = stream.codec_name ?? 'unknown';
@@ -113,7 +171,7 @@ export class FFprobeAdapter {
                 };
             });
 
-        const coverArts = raw.streams
+        const coverArts: FFprobeCoverArt[] = rawStreams
             .filter((stream) => stream.disposition?.attached_pic === 1)
             .map((stream) => ({
                 index: stream.index,
@@ -145,7 +203,7 @@ export class FFprobeAdapter {
         };
     }
 
-    public async inspect(canonicalPath: string) {
+    public async inspect(canonicalPath: string): Promise<FFprobeInspectionResult> {
         const args = ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', canonicalPath];
 
         try {
@@ -156,7 +214,7 @@ export class FFprobeAdapter {
             });
 
             const raw = JSON.parse(stdout) as FFprobeRawOutput;
-            return { ...this.normalizeMetadata(raw), raw };
+            return { ...this.normalizeResult(raw), raw };
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
 

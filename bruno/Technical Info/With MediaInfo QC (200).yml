@@ -39,7 +39,7 @@ runtime:
       value: "true"
     - expression: res.body.data.technical
       operator: isDefined
-    - expression: res.body.data.technical.codec
+    - expression: res.body.data.technical.container
       operator: isDefined
     - expression: res.body.data.qc
       operator: isDefined

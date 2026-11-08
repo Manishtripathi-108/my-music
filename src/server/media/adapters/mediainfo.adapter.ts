@@ -1,4 +1,6 @@
+import type { MediaInfo } from 'mediainfo.js';
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import 'server-only';
@@ -11,6 +13,7 @@ const execFileAsync = promisify(execFile);
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
+const DEFAULT_WASM_POOL_SIZE = 8;
 
 type MediaInfoRecord = Record<string, unknown>;
 
@@ -19,7 +22,6 @@ export interface MediaInfoAudioTrack {
     streamPosition?: number;
     streamOrder?: number;
 
-    id?: string;
     uniqueId?: string;
 
     codec: string;
@@ -138,7 +140,6 @@ export interface MediaInfoOtherStream {
     streamPosition?: number;
     streamOrder?: number;
 
-    id?: string;
     format?: string;
     codecId?: string;
     codecLongName?: string;
@@ -191,9 +192,6 @@ export interface MediaInfoNormalizedResult {
     isStreamable?: boolean;
     audioChannelsTotal?: number;
 
-    trackCount: number;
-    streamCount: number;
-
     streamCounts: MediaInfoStreamCounts;
 
     hasAudio: boolean;
@@ -230,6 +228,7 @@ function normalizeAudioTrack(track: MediaInfoRecord): MediaInfoAudioTrack {
     const codec = normalizeIdentifier(format) ?? 'unknown';
     const compressionMode = parseString(track['Compression_Mode']);
     const containerFormat = parseString(track['ContainerFormat']) ?? parseString(track['MuxingMode']);
+    const extra = asRecord(track['extra']);
 
     return {
         streamKindId: parseFiniteInteger(track['StreamKindID']),
@@ -300,7 +299,7 @@ function normalizeAudioTrack(track: MediaInfoRecord): MediaInfoAudioTrack {
         encodedApplication: parseString(track['Encoded_Application']),
         encodedApplicationVersion: parseString(track['Encoded_Application_Version']),
 
-        audioMd5: parseString(track?.extra?.MD5_Unencoded),
+        audioMd5: parseString(extra?.['MD5_Unencoded']),
 
         isLossless: isLosslessAudio(codec, containerFormat, compressionMode),
     };
@@ -381,106 +380,106 @@ function normalizeOtherStream(track: MediaInfoRecord): MediaInfoOtherStream {
     };
 }
 
-export class MediaInfoAdapter {
+export function normalizeMediaInfoResult(raw: unknown): MediaInfoNormalizedResult {
+    const root = asRecord(raw);
+
+    if (!root) {
+        throw new TypeError('Invalid MediaInfo JSON output');
+    }
+
+    const media = asRecord(root.media);
+
+    const trackValues = Array.isArray(media?.track) ? media.track : Array.isArray(root.rawTracks) ? root.rawTracks : undefined;
+
+    if (!trackValues) {
+        throw new TypeError('MediaInfo output does not contain a track array');
+    }
+
+    const tracks = trackValues.map(asRecord).filter((track): track is MediaInfoRecord => track !== undefined);
+
+    if (tracks.length === 0) {
+        throw new TypeError('MediaInfo returned no valid tracks');
+    }
+
+    const general = tracks.find((track) => readTrackType(track) === 'general') ?? {};
+
+    const audioTracks = tracks.filter((track) => readTrackType(track) === 'audio');
+
+    const imageTracks = tracks.filter((track) => readTrackType(track) === 'image');
+
+    const streamTracks = tracks.filter((track) => readTrackType(track) !== 'general');
+
+    const audio = audioTracks.map(normalizeAudioTrack);
+    const coverArts = imageTracks.map(normalizeImageTrack);
+
+    const otherStreams = streamTracks
+        .filter((track) => {
+            const type = readTrackType(track);
+
+            return type !== 'audio' && type !== 'image';
+        })
+        .map(normalizeOtherStream);
+
+    const countTracks = (type: string) => streamTracks.filter((track) => readTrackType(track) === type).length;
+
+    const streamCounts: MediaInfoStreamCounts = {
+        total: streamTracks.length,
+        audio: audio.length,
+        image: coverArts.length,
+        video: countTracks('video'),
+        text: countTracks('text'),
+        menu: countTracks('menu'),
+        other: countTracks('other'),
+        unknown: streamTracks.filter((track) => readTrackType(track) === undefined).length,
+    };
+
+    const duration = parseFiniteNumber(general['Duration']) ?? audio.find((stream) => stream.duration !== undefined)?.duration;
+
+    const format = parseString(general['Format']);
+
+    return {
+        container: normalizeIdentifier(format) ?? 'unknown',
+        containerFormat: format,
+        containerLongName: parseString(general['Format_Info']) ?? parseString(general['Format_Commercial']),
+        containerCommercial: parseString(general['Format_Commercial']),
+        containerProfile: parseString(general['Format_Profile']),
+        containerVersion: parseString(general['Format_Version']),
+        containerCodecId: parseString(general['CodecID']),
+        mimeType: parseString(general['InternetMediaType']),
+
+        duration,
+        bitRate: parseFiniteNumber(general['OverallBitRate']),
+        bitRateMode: parseString(general['OverallBitRate_Mode']),
+        bitRateModeLabel: parseString(general['OverallBitRate_Mode_String']),
+        bitRateMinimum: parseFiniteNumber(general['OverallBitRate_Minimum']),
+        bitRateMaximum: parseFiniteNumber(general['OverallBitRate_Maximum']),
+        bitRateNominal: parseFiniteNumber(general['OverallBitRate_Nominal']),
+
+        size: parseFiniteNumber(general['FileSize']),
+        dataSize: parseFiniteNumber(general['DataSize']),
+        headerSize: parseFiniteNumber(general['HeaderSize']),
+        footerSize: parseFiniteNumber(general['FooterSize']),
+
+        isStreamable: parseBoolean(general['IsStreamable']),
+        audioChannelsTotal: parseFiniteInteger(general['Audio_Channels_Total']),
+
+        streamCounts,
+
+        hasAudio: audio.length > 0,
+        hasCoverArt: coverArts.length > 0,
+        isLossless: audio.length > 0 && audio.every((stream) => stream.isLossless),
+
+        audio,
+        coverArts,
+        otherStreams,
+    };
+}
+
+export class MediaInfoNativeAdapter {
     private readonly binaryPath: string;
 
     constructor(binaryPath = serverEnv.MEDIAINFO_PATH) {
         this.binaryPath = binaryPath;
-    }
-
-    private normalizeResult(raw: unknown): MediaInfoNormalizedResult {
-        const root = asRecord(raw);
-
-        if (!root) {
-            throw new TypeError('Invalid MediaInfo JSON output');
-        }
-
-        const media = asRecord(root.media);
-
-        const trackValues = Array.isArray(media?.track) ? media.track : Array.isArray(root.rawTracks) ? root.rawTracks : undefined;
-
-        if (!trackValues) {
-            throw new TypeError('MediaInfo output does not contain a track array');
-        }
-
-        const tracks = trackValues.map(asRecord).filter((track): track is MediaInfoRecord => track !== undefined);
-
-        if (tracks.length === 0) {
-            throw new TypeError('MediaInfo returned no valid tracks');
-        }
-
-        const general = tracks.find((track) => readTrackType(track) === 'general') ?? {};
-
-        const audioTracks = tracks.filter((track) => readTrackType(track) === 'audio');
-
-        const imageTracks = tracks.filter((track) => readTrackType(track) === 'image');
-
-        const streamTracks = tracks.filter((track) => readTrackType(track) !== 'general');
-
-        const audio = audioTracks.map(normalizeAudioTrack);
-        const coverArts = imageTracks.map(normalizeImageTrack);
-
-        const otherStreams = streamTracks
-            .filter((track) => {
-                const type = readTrackType(track);
-
-                return type !== 'audio' && type !== 'image';
-            })
-            .map(normalizeOtherStream);
-
-        const countTracks = (type: string) => streamTracks.filter((track) => readTrackType(track) === type).length;
-
-        const streamCounts: MediaInfoStreamCounts = {
-            total: streamTracks.length,
-            audio: audio.length,
-            image: coverArts.length,
-            video: countTracks('video'),
-            text: countTracks('text'),
-            menu: countTracks('menu'),
-            other: countTracks('other'),
-            unknown: streamTracks.filter((track) => readTrackType(track) === undefined).length,
-        };
-
-        const duration = parseFiniteNumber(general['Duration']) ?? audio.find((stream) => stream.duration !== undefined)?.duration;
-
-        const format = parseString(general['Format']);
-
-        return {
-            container: normalizeIdentifier(format) ?? 'unknown',
-            containerFormat: format,
-            containerLongName: parseString(general['Format_Info']) ?? parseString(general['Format_Commercial']),
-            containerCommercial: parseString(general['Format_Commercial']),
-            containerProfile: parseString(general['Format_Profile']),
-            containerVersion: parseString(general['Format_Version']),
-            containerCodecId: parseString(general['CodecID']),
-            mimeType: parseString(general['InternetMediaType']),
-
-            duration,
-            bitRate: parseFiniteNumber(general['OverallBitRate']),
-            bitRateMode: parseString(general['OverallBitRate_Mode']),
-            bitRateModeLabel: parseString(general['OverallBitRate_Mode_String']),
-            bitRateMinimum: parseFiniteNumber(general['OverallBitRate_Minimum']),
-            bitRateMaximum: parseFiniteNumber(general['OverallBitRate_Maximum']),
-            bitRateNominal: parseFiniteNumber(general['OverallBitRate_Nominal']),
-
-            size: parseFiniteNumber(general['FileSize']),
-            dataSize: parseFiniteNumber(general['DataSize']),
-            headerSize: parseFiniteNumber(general['HeaderSize']),
-            footerSize: parseFiniteNumber(general['FooterSize']),
-
-            isStreamable: parseBoolean(general['IsStreamable']),
-            audioChannelsTotal: parseFiniteInteger(general['Audio_Channels_Total']),
-
-            streamCounts,
-
-            hasAudio: audio.length > 0,
-            hasCoverArt: coverArts.length > 0,
-            isLossless: audio.length > 0 && audio.every((stream) => stream.isLossless),
-
-            audio,
-            coverArts,
-            otherStreams,
-        };
     }
 
     public async inspect(canonicalPath: string): Promise<MediaInfoInspectionResult> {
@@ -505,7 +504,7 @@ export class MediaInfoAdapter {
             const raw: unknown = JSON.parse(output);
 
             return {
-                ...this.normalizeResult(raw),
+                ...normalizeMediaInfoResult(raw),
                 raw,
             };
         } catch (error) {
@@ -513,5 +512,165 @@ export class MediaInfoAdapter {
 
             throw new Error(`MediaInfo failed for "${path.basename(canonicalPath)}": ${message}`, { cause: error });
         }
+    }
+}
+
+/**
+ * High-performance instance pool for MediaInfo WASM analyzers.
+ * Guarantees bounded concurrency and prevents the Emscripten "isAnalyzing" collision.
+ */
+class MediaInfoWasmPool {
+    private readonly maxSize: number;
+    private readonly pool: MediaInfo<'object'>[] = [];
+    private activeCount = 0;
+    private readonly waitQueue: Array<(instance: MediaInfo<'object'>) => void> = [];
+
+    constructor(maxSize = DEFAULT_WASM_POOL_SIZE) {
+        this.maxSize = maxSize;
+    }
+
+    private async createInstance(): Promise<MediaInfo<'object'>> {
+        const { default: mediaInfoFactory } = await import('mediainfo.js');
+        return mediaInfoFactory({ format: 'object', full: true });
+    }
+
+    public async acquire(): Promise<MediaInfo<'object'>> {
+        if (this.pool.length > 0) {
+            return this.pool.pop()!;
+        }
+
+        if (this.activeCount < this.maxSize) {
+            this.activeCount++;
+            try {
+                return await this.createInstance();
+            } catch (error) {
+                this.activeCount--;
+                throw error;
+            }
+        }
+
+        return new Promise<MediaInfo<'object'>>((resolve) => {
+            this.waitQueue.push(resolve);
+        });
+    }
+
+    public release(instance: MediaInfo<'object'>): void {
+        const next = this.waitQueue.shift();
+        if (next) {
+            next(instance);
+        } else {
+            this.pool.push(instance);
+        }
+    }
+
+    public async withInstance<T>(fn: (instance: MediaInfo<'object'>) => Promise<T>): Promise<T> {
+        const instance = await this.acquire();
+        try {
+            return await fn(instance);
+        } finally {
+            this.release(instance);
+        }
+    }
+
+    public closeAll(): void {
+        while (this.pool.length > 0) {
+            const instance = this.pool.pop();
+            try {
+                instance?.close();
+            } catch {
+                // Ignore closing errors on shutdown
+            }
+        }
+        this.activeCount = 0;
+    }
+}
+
+const defaultWasmPool = new MediaInfoWasmPool();
+
+export class MediaInfoWasmAdapter {
+    private readonly pool: MediaInfoWasmPool;
+
+    constructor(pool = defaultWasmPool) {
+        this.pool = pool;
+    }
+
+    public async inspect(canonicalPath: string): Promise<MediaInfoInspectionResult> {
+        let fileHandle: fs.promises.FileHandle | null = null;
+
+        try {
+            fileHandle = await fs.promises.open(canonicalPath, 'r');
+            const fileStats = await fileHandle.stat();
+
+            if (fileStats.size === 0) {
+                throw new Error('MediaInfo WASM failed: file is empty');
+            }
+
+            const raw = await this.pool.withInstance(async (mediainfo) => {
+                const readChunk = async (size: number, offset: number): Promise<Uint8Array> => {
+                    const buffer = Buffer.alloc(size);
+                    const { bytesRead } = await fileHandle!.read(buffer, 0, size, offset);
+                    return buffer.subarray(0, bytesRead);
+                };
+
+                return mediainfo.analyzeData(fileStats.size, readChunk);
+            });
+
+            return {
+                ...normalizeMediaInfoResult(raw),
+                raw,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`MediaInfo WASM failed for "${path.basename(canonicalPath)}": ${message}`, { cause: error });
+        } finally {
+            if (fileHandle) {
+                await fileHandle.close().catch(() => {});
+            }
+        }
+    }
+}
+
+/**
+ * Unified Quality-Control Adapter.
+ * Dispatches to native MediaInfo CLI or pooled MediaInfo WASM according to PROBING_ENGINE,
+ * with seamless fallback if the primary engine encounters a failure.
+ */
+export class MediaInfoAdapter {
+    private readonly nativeAdapter: MediaInfoNativeAdapter;
+    private readonly wasmAdapter: MediaInfoWasmAdapter;
+
+    constructor(binaryPath = serverEnv.MEDIAINFO_PATH, wasmAdapter = new MediaInfoWasmAdapter()) {
+        this.nativeAdapter = new MediaInfoNativeAdapter(binaryPath);
+        this.wasmAdapter = wasmAdapter;
+    }
+
+    public async inspect(canonicalPath: string): Promise<MediaInfoInspectionResult> {
+        const configured = serverEnv.PROBING_ENGINE;
+
+        if (configured === 'wasm') {
+            try {
+                return await this.wasmAdapter.inspect(canonicalPath);
+            } catch (wasmError) {
+                try {
+                    return await this.nativeAdapter.inspect(canonicalPath);
+                } catch {
+                    throw wasmError;
+                }
+            }
+        }
+
+        try {
+            return await this.nativeAdapter.inspect(canonicalPath);
+        } catch (nativeError) {
+            try {
+                return await this.wasmAdapter.inspect(canonicalPath);
+            } catch {
+                throw nativeError;
+            }
+        }
+    }
+
+    public normalizeResult(raw: unknown) {
+        return normalizeMediaInfoResult(raw);
     }
 }

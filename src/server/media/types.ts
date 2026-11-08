@@ -1,4 +1,22 @@
-import type { AudioTags, BitrateMode, ConversionTargetFormat, WriteAudioTags } from '@/lib/media';
+import type { AudioTags, ConversionTargetFormat, WriteAudioTags } from '@/lib/media';
+
+import type {
+    FFprobeAudioStream,
+    FFprobeCodecType,
+    FFprobeCoverArt,
+    FFprobeInspectionResult,
+    FFprobeNormalizedResult,
+    FFprobeRawOutput,
+    FFprobeStream,
+} from './adapters/ffprobe.adapter';
+import type {
+    MediaInfoAudioTrack,
+    MediaInfoImageTrack,
+    MediaInfoInspectionResult,
+    MediaInfoNormalizedResult,
+    MediaInfoOtherStream,
+    MediaInfoStreamCounts,
+} from './adapters/mediainfo.adapter';
 
 /* -------------------------- Artwork Domain Models ------------------------- */
 
@@ -19,43 +37,27 @@ export interface RawPictureData {
 
 /* ------------------------- Technical Probing Models ----------------------- */
 
-export interface TechnicalAudioInfo {
-    codec: string;
-    codecLongName: string;
-    containerFormat: string;
-    containerLongName: string;
-    duration: number;
-    bitrate: number;
-    sampleRate: number;
-    channels: number;
-    channelLayout?: string;
-    bitsPerSample?: number;
-    isLossless: boolean;
-    hasAttachedPicture: boolean;
-    streamCount: number;
-    rawStreams?: unknown[];
-    rawFormat?: unknown;
-}
+export type TechnicalAudioInfo = FFprobeInspectionResult;
+export type MediaInfoQC = MediaInfoInspectionResult;
 
-export interface MediaInfoQC {
-    format: string;
-    bitrateMode?: BitrateMode;
-    overallBitrate?: number;
-    maximumBitrate?: number;
-    bitDepth?: number;
-    compressionMode?: string;
-    encodedLibrary?: string;
-    encodedLibrarySettings?: string;
-    delay?: number;
-    padding?: number;
-    replayGain?: {
-        trackGain?: number;
-        trackPeak?: number;
-        albumGain?: number;
-        albumPeak?: number;
-    };
-    rawTracks?: unknown[];
-}
+export type {
+    FFprobeCodecType,
+    FFprobeRawOutput,
+    FFprobeStream,
+    FFprobeAudioStream,
+    FFprobeCoverArt,
+    FFprobeNormalizedResult,
+    FFprobeInspectionResult,
+};
+
+export type {
+    MediaInfoAudioTrack,
+    MediaInfoImageTrack,
+    MediaInfoOtherStream,
+    MediaInfoStreamCounts,
+    MediaInfoNormalizedResult,
+    MediaInfoInspectionResult,
+};
 
 /* ------------------------ Unified Metadata Models ------------------------- */
 
@@ -64,8 +66,8 @@ export interface CombinedAudioMetadata {
     fileSizeBytes: number;
     lastModified: string;
     tags: AudioTags;
-    technical: TechnicalAudioInfo;
-    qc?: MediaInfoQC | null;
+    technical: FFprobeInspectionResult;
+    qc?: MediaInfoInspectionResult | null;
     artwork?: ExtractedArtwork | null;
     rawTagMetadata?: Record<string, unknown>;
     rawFFprobeMetadata?: unknown;
@@ -156,20 +158,15 @@ export interface MetadataAdapter {
 
 /** Audio Prober Adapter interface for stream parameters and container format inspection. */
 export interface AudioProberAdapter {
-    inspect(canonicalPath: string): Promise<TechnicalAudioInfo>;
+    inspect(canonicalPath: string): Promise<FFprobeInspectionResult>;
 }
 
 /** Quality-Control Prober Adapter interface for forensic media and bitrate metrics. */
 export interface QualityControlAdapter {
-    inspect(canonicalPath: string): Promise<MediaInfoQC>;
+    inspect(canonicalPath: string): Promise<MediaInfoInspectionResult>;
 }
 
 /** Media Converter Engine interface for audio transcoding and DSP operations. */
 export interface MediaConverterEngine {
-    convert(
-        inputPath: string,
-        options: ConversionOptions,
-        onProgress?: ConversionProgressCallback,
-        signal?: AbortSignal
-    ): Promise<ConversionResult>;
+    convert(inputPath: string, options: ConversionOptions, onProgress?: ConversionProgressCallback, signal?: AbortSignal): Promise<ConversionResult>;
 }

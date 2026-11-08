@@ -1,0 +1,40 @@
+info:
+  name: Missing Query Params (422)
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/media/artwork"
+  headers:
+    - name: Accept
+      value: application/json
+  auth:
+    type: bearer
+    token: "{{authToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should reject missing file or path query param with 422", function() {
+          expect(res.getStatus()).to.equal(422);
+          expect(res.getBody().success).to.be.false;
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "422"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: VALIDATION_ERROR
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

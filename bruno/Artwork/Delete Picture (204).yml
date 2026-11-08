@@ -1,0 +1,37 @@
+info:
+  name: Delete Picture (204)
+  type: http
+  seq: 9
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/media/artwork?path={{sampleAudioPathFlac}}"
+  headers:
+    - name: Accept
+      value: application/json
+  params:
+    - name: path
+      value: "{{sampleAudioPathFlac}}"
+      type: query
+  auth:
+    type: bearer
+    token: "{{authToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should successfully remove artwork", function() {
+          expect([200, 204]).to.include(res.getStatus());
+        });
+  assertions:
+    - expression: res.status
+      operator: in
+      value: "[200, 204]"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

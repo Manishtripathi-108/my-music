@@ -1,0 +1,37 @@
+info:
+  name: Cache Direct Binary Stream (200)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/media/artwork?file={{sampleArtworkFilename}}"
+  params:
+    - name: file
+      value: "{{sampleArtworkFilename}}"
+      type: query
+  auth:
+    type: bearer
+    token: "{{authToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns image binary or 404 if no cached cover", function() {
+          expect([200, 404]).to.include(res.getStatus());
+          if (res.getStatus() === 200) {
+            expect(res.getHeader('cache-control')).to.include('public');
+          }
+        });
+  assertions:
+    - expression: res.status
+      operator: in
+      value: "[200, 404]"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

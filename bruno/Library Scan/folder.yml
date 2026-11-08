@@ -1,5 +1,4 @@
 info:
   name: Library Scan
   type: folder
-
-request: {}
+  seq: 3

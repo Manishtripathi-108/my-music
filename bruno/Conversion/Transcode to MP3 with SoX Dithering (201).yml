@@ -1,0 +1,59 @@
+info:
+  name: Transcode to MP3 with SoX Dithering (201)
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/media/convert"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "inputPath": "{{sampleAudioPathFlac}}",
+        "targetFormat": "mp3",
+        "bitrate": "320k",
+        "resampler": "soxr",
+        "ditherMethod": "triangular",
+        "downmixStereo": true
+      }
+  auth:
+    type: bearer
+    token: "{{authToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("transcodes audio to MP3 with DSP filter chain", function() {
+          expect(res.getStatus()).to.equal(201);
+          expect(res.getBody().success).to.be.true;
+          expect(res.getBody().data.targetFormat).to.equal("mp3");
+          expect(res.getBody().data.outputPath).to.be.a('string');
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.targetFormat
+      operator: eq
+      value: '"mp3"'
+    - expression: res.body.data.outputPath
+      operator: isDefined
+    - expression: res.body.data.duration
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

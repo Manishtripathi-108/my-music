@@ -1,6 +1,7 @@
+name: Local
 variables:
   - name: baseUrl
-    value: http://localhost:3000
+    value: http://localhost:3001
   - name: sampleAudioPath
     value: E:/Code/Next/my-music/music-files/Psycho! - Masn.m4a
   - name: sampleAudioPathFlac

@@ -13,6 +13,10 @@ http:
     - name: path
       value: "{{sampleAudioPathFlac}}"
       type: query
+    - name: includeQC
+      value: "true"
+      type: query
+      disabled: true
   auth:
     type: bearer
     token: "{{authToken}}"

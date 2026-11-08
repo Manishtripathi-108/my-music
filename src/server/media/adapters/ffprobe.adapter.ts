@@ -14,7 +14,7 @@ const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 
 export type FFprobeCodecType = 'audio' | 'video' | 'subtitle' | 'data' | 'attachment' | 'unknown';
 
-export interface FFprobeOutput {
+export interface FFprobeRawOutput {
     streams: FFprobeStream[];
     format: {
         format_name: string;
@@ -71,35 +71,7 @@ export class FFprobeAdapter {
         this.binaryPath = binaryPath;
     }
 
-    public async inspect(canonicalPath: string) {
-        const args = ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', canonicalPath];
-
-        let stdout: string;
-
-        try {
-            ({ stdout } = await execFileAsync(this.binaryPath, args, {
-                timeout: DEFAULT_TIMEOUT_MS,
-                maxBuffer: MAX_OUTPUT_BYTES,
-                windowsHide: true,
-            }));
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-
-            throw new Error(`FFprobe failed for "${path.basename(canonicalPath)}": ${message}`, { cause: error });
-        }
-
-        let raw: FFprobeOutput;
-
-        try {
-            raw = JSON.parse(stdout) as FFprobeOutput;
-        } catch (error) {
-            throw new Error(`FFprobe returned invalid JSON for "${path.basename(canonicalPath)}"`, { cause: error });
-        }
-
-        return { ...this.normalizeMetadata(raw), raw };
-    }
-
-    private normalizeMetadata(raw: FFprobeOutput) {
+    private normalizeMetadata(raw: FFprobeRawOutput) {
         const formatDuration = parseFiniteNumber(raw.format.duration);
 
         const format = {
@@ -154,7 +126,9 @@ export class FFprobeAdapter {
                 width: stream.width ?? 0,
                 height: stream.height ?? 0,
 
-                aspectRatio: stream.sample_aspect_ratio,
+                aspectRatio: stream.width && stream.height ? Number((stream.width / stream.height).toFixed(6)) : undefined,
+
+                sampleAspectRatio: stream.sample_aspect_ratio,
                 displayAspectRatio: stream.display_aspect_ratio,
             }));
 
@@ -169,5 +143,24 @@ export class FFprobeAdapter {
             coverArts,
             audio,
         };
+    }
+
+    public async inspect(canonicalPath: string) {
+        const args = ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', canonicalPath];
+
+        try {
+            const { stdout } = await execFileAsync(this.binaryPath, args, {
+                timeout: DEFAULT_TIMEOUT_MS,
+                maxBuffer: MAX_OUTPUT_BYTES,
+                windowsHide: true,
+            });
+
+            const raw = JSON.parse(stdout) as FFprobeRawOutput;
+            return { ...this.normalizeMetadata(raw), raw };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+
+            throw new Error(`FFprobe failed for "${path.basename(canonicalPath)}": ${message}`, { cause: error });
+        }
     }
 }

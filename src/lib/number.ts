@@ -29,6 +29,34 @@ export function parseFiniteInteger(value: unknown): number | undefined {
     return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
+export function parseString(value: unknown): string | undefined {
+    if (value === null || value === undefined) return undefined;
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed || undefined;
+    }
+
+    return String(value);
+}
+
+const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const FALSE_VALUES = new Set(['0', 'false', 'no', 'off']);
+
+export function parseBoolean(value: unknown): boolean | undefined {
+    if (typeof value === 'boolean') return value;
+    if (value === 1) return true;
+    if (value === 0) return false;
+
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+
+        if (TRUE_VALUES.has(normalized)) return true;
+        if (FALSE_VALUES.has(normalized)) return false;
+    }
+
+    return undefined;
+}
 /**
  * Clamps a numeric value between a minimum and maximum boundary.
  *

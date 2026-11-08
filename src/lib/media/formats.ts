@@ -63,12 +63,17 @@ export const LOSSLESS_CODECS = new Set([
  *
  * @param codec - Codec identifier (e.g. 'flac', 'pcm_s16le', 'mp3').
  * @param containerFormat - Container format (e.g. 'wav', 'mp4', 'flac').
+ * @param compressionMode - Optional compression mode string (e.g. 'Lossless', 'Lossy').
  */
-export function isLosslessAudio(codec: string, containerFormat?: string): boolean {
-    const normalized = codec.toLowerCase();
-    if (LOSSLESS_CODECS.has(normalized)) return true;
-    if (containerFormat?.toLowerCase() === 'wav' && normalized.startsWith('pcm')) return true;
-    return false;
+export function isLosslessAudio(codec: string, containerFormat?: string, compressionMode?: string): boolean {
+    const mode = compressionMode?.toLowerCase();
+
+    if (mode === 'lossless') return true;
+    if (mode === 'lossy') return false;
+
+    const normalizedCodec = codec.toLowerCase();
+
+    return LOSSLESS_CODECS.has(normalizedCodec) || (containerFormat?.toLowerCase() === 'wav' && normalizedCodec.startsWith('pcm'));
 }
 
 /**

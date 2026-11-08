@@ -6,14 +6,14 @@ import { applyCoverArt, applyTags, clearPictures, readMetadata, readPictures } f
 
 import type { AudioTags, WriteAudioTags } from '@/lib/media';
 
-import type { MetadataAdapter, RawPictureData, TagWriteOptions, TagWriteResult } from '../types';
+import type { RawPictureData, TagWriteOptions, TagWriteResult } from '../types';
 import { TagMapper } from './tag-mapper';
 
 /**
  * Audio Metadata Adapter powered by TagLib 2.x (taglib-wasm).
  * Preserves audio bitstreams bit-for-bit with atomic crash-safe writes.
  */
-export class TagLibAdapter implements MetadataAdapter {
+export class TagLibAdapter {
     /**
      * Reads all normalized tags and embedded cover art from an audio file.
      */

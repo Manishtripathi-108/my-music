@@ -1,13 +1,22 @@
-import type { MediaInfo } from 'mediainfo.js';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import type { MediaInfo } from 'mediainfo.js';
 import 'server-only';
 
 import { serverEnv } from '@/config/env.server';
 import { isLosslessAudio } from '@/lib/media';
 import { parseBoolean, parseFiniteInteger, parseFiniteNumber, parseString } from '@/lib/number';
+
+import type {
+    MediaInfoAudioTrack,
+    MediaInfoImageTrack,
+    MediaInfoInspectionResult,
+    MediaInfoNormalizedResult,
+    MediaInfoOtherStream,
+    MediaInfoStreamCounts,
+} from '../types';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,195 +26,14 @@ const DEFAULT_WASM_POOL_SIZE = 8;
 
 type MediaInfoRecord = Record<string, unknown>;
 
-export interface MediaInfoAudioTrack {
-    streamKindId?: number;
-    streamPosition?: number;
-    streamOrder?: number;
-
-    uniqueId?: string;
-
-    codec: string;
-    format?: string;
-    codecLongName?: string;
-    formatCommercial?: string;
-    codecId?: string;
-    codecIdDescription?: string;
-    profile?: string;
-    formatVersion?: string;
-    formatSettings?: string;
-    additionalFeatures?: string;
-    internetMediaType?: string;
-    muxingMode?: string;
-
-    bitRate?: number;
-    bitRateEncoded?: number;
-    bitRateMinimum?: number;
-    bitRateMaximum?: number;
-    bitRateNominal?: number;
-    bitRateMode?: string;
-    bitRateModeLabel?: string;
-
-    channels?: number;
-    channelsOriginal?: number;
-    channelLayout?: string;
-    channelLayoutOriginal?: string;
-    channelPositions?: string;
-    channelPositionsOriginal?: string;
-    channelPositionsString2?: string;
-
-    sampleRate?: number;
-    sampleCount?: number;
-
-    bitDepth?: number;
-    bitDepthDetected?: number;
-    bitDepthStored?: number;
-
-    compressionMode?: string;
-    compressionRatio?: number;
-
-    duration?: number;
-    durationFirstFrame?: number;
-    durationLastFrame?: number;
-
-    streamSize?: number;
-    streamSizeEncoded?: number;
-    streamSizeDemuxed?: number;
-    streamSizeProportion?: number;
-
-    language?: string;
-    default?: boolean;
-    forced?: boolean;
-    disabled?: boolean;
-
-    encodedLibrary?: string;
-    encodedLibraryString?: string;
-    encodedLibraryName?: string;
-    encodedLibraryVersion?: string;
-    encodedLibrarySettings?: string;
-
-    encodedApplication?: string;
-    encodedApplicationVersion?: string;
-
-    audioMd5?: string;
-
-    isLossless: boolean;
-}
-
-export interface MediaInfoImageTrack {
-    streamKindId?: number;
-    streamPosition?: number;
-    streamOrder?: number;
-
-    uniqueId?: string;
-
-    type?: string;
-    typeString?: string;
-
-    format: string;
-    formatName?: string;
-    codecId?: string;
-    codecIdDescription?: string;
-    profile?: string;
-    formatVersion?: string;
-    formatSettings?: string;
-    internetMediaType?: string;
-    muxingMode?: string;
-
-    width?: number;
-    height?: number;
-
-    colorSpace?: string;
-    chromaSubsampling?: string;
-    bitDepth?: number;
-    compressionMode?: string;
-    compressionRatio?: number;
-
-    colorDescriptionPresent?: string;
-    colorPrimaries?: string;
-    colorRange?: string;
-    matrixCoefficients?: string;
-    transferCharacteristics?: string;
-
-    streamSize?: number;
-    streamSizeProportion?: number;
-
-    default?: boolean;
-    forced?: boolean;
-    disabled?: boolean;
-}
-
-export interface MediaInfoOtherStream {
-    type: string;
-    streamKindId?: number;
-    streamPosition?: number;
-    streamOrder?: number;
-
-    format?: string;
-    codecId?: string;
-    codecLongName?: string;
-
-    duration?: number;
-    streamSize?: number;
-
-    width?: number;
-    height?: number;
-    channels?: number;
-    sampleRate?: number;
-
-    language?: string;
-}
-
-export interface MediaInfoStreamCounts {
-    total: number;
-    audio: number;
-    image: number;
-    video: number;
-    text: number;
-    menu: number;
-    other: number;
-    unknown: number;
-}
-
-export interface MediaInfoNormalizedResult {
-    container: string;
-    containerFormat?: string;
-    containerLongName?: string;
-    containerCommercial?: string;
-    containerProfile?: string;
-    containerVersion?: string;
-    containerCodecId?: string;
-    mimeType?: string;
-
-    duration?: number;
-    bitRate?: number;
-    bitRateMode?: string;
-    bitRateModeLabel?: string;
-    bitRateMinimum?: number;
-    bitRateMaximum?: number;
-    bitRateNominal?: number;
-
-    size?: number;
-    dataSize?: number;
-    headerSize?: number;
-    footerSize?: number;
-
-    isStreamable?: boolean;
-    audioChannelsTotal?: number;
-
-    streamCounts: MediaInfoStreamCounts;
-
-    hasAudio: boolean;
-    hasCoverArt: boolean;
-    isLossless: boolean;
-
-    audio: MediaInfoAudioTrack[];
-    coverArts: MediaInfoImageTrack[];
-    otherStreams: MediaInfoOtherStream[];
-}
-
-export interface MediaInfoInspectionResult extends MediaInfoNormalizedResult {
-    raw: unknown;
-}
+export type {
+    MediaInfoAudioTrack,
+    MediaInfoImageTrack,
+    MediaInfoInspectionResult,
+    MediaInfoNormalizedResult,
+    MediaInfoOtherStream,
+    MediaInfoStreamCounts,
+};
 
 function asRecord(value: unknown): MediaInfoRecord | undefined {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -230,7 +58,25 @@ function normalizeAudioTrack(track: MediaInfoRecord): MediaInfoAudioTrack {
     const containerFormat = parseString(track['ContainerFormat']) ?? parseString(track['MuxingMode']);
     const extra = asRecord(track['extra']);
 
+    const bitDepth = parseFiniteInteger(track['BitDepth']);
+    const bitDepthDetected = parseFiniteInteger(track['BitDepth_Detected']);
+    const bitDepthStored = parseFiniteInteger(track['BitDepth_Stored']);
+
+    const bitRate = parseFiniteNumber(track['BitRate']);
+    const bitRateMode = parseString(track['BitRate_Mode']);
+    const bitRateModeLabel = parseString(track['BitRate_Mode_String']);
+
+    const channels = parseFiniteInteger(track['Channels']) ?? 0;
+    const codecId = parseString(track['CodecID']);
+
+    const streamIndex =
+        parseFiniteInteger(track['StreamOrder']) ??
+        parseFiniteInteger(track['StreamKindPos']) ??
+        parseFiniteInteger(track['StreamKindID']) ??
+        0;
+
     return {
+        index: streamIndex,
         streamKindId: parseFiniteInteger(track['StreamKindID']),
         streamPosition: parseFiniteInteger(track['StreamKindPos']),
         streamOrder: parseFiniteInteger(track['StreamOrder']),
@@ -241,24 +87,26 @@ function normalizeAudioTrack(track: MediaInfoRecord): MediaInfoAudioTrack {
         format,
         codecLongName: parseString(track['Format_Info']) ?? parseString(track['Format_Commercial']) ?? parseString(track['Format_String']),
         formatCommercial: parseString(track['Format_Commercial']),
-        codecId: parseString(track['CodecID']),
+        codecId,
+        codecTag: codecId,
         codecIdDescription: parseString(track['CodecID_Description']),
         profile: parseString(track['Format_Profile']),
         formatVersion: parseString(track['Format_Version']),
         formatSettings: parseString(track['Format_Settings']),
+        sampleFormat: parseString(track['Format_Settings']) ?? parseString(track['Format_Profile']),
         additionalFeatures: parseString(track['Format_AdditionalFeatures']),
         internetMediaType: parseString(track['InternetMediaType']),
         muxingMode: parseString(track['MuxingMode']),
 
-        bitRate: parseFiniteNumber(track['BitRate']),
+        bitRate,
+        bitRateMode,
+        bitRateModeLabel,
         bitRateEncoded: parseFiniteNumber(track['BitRate_Encoded']),
         bitRateMinimum: parseFiniteNumber(track['BitRate_Minimum']),
         bitRateMaximum: parseFiniteNumber(track['BitRate_Maximum']),
         bitRateNominal: parseFiniteNumber(track['BitRate_Nominal']),
-        bitRateMode: parseString(track['BitRate_Mode']),
-        bitRateModeLabel: parseString(track['BitRate_Mode_String']),
 
-        channels: parseFiniteInteger(track['Channels']),
+        channels,
         channelsOriginal: parseFiniteInteger(track['Channels_Original']),
         channelLayout: parseString(track['ChannelLayout']),
         channelLayoutOriginal: parseString(track['ChannelLayout_Original']),
@@ -269,9 +117,11 @@ function normalizeAudioTrack(track: MediaInfoRecord): MediaInfoAudioTrack {
         sampleRate: parseFiniteNumber(track['SamplingRate']),
         sampleCount: parseFiniteNumber(track['SamplingCount']),
 
-        bitDepth: parseFiniteInteger(track['BitDepth']),
-        bitDepthDetected: parseFiniteInteger(track['BitDepth_Detected']),
-        bitDepthStored: parseFiniteInteger(track['BitDepth_Stored']),
+        bitDepth,
+        bitsPerSample: bitDepth,
+        bitsPerRawSample: bitDepthDetected ?? bitDepthStored ?? bitDepth,
+        bitDepthDetected,
+        bitDepthStored,
 
         compressionMode,
         compressionRatio: parseFiniteNumber(track['Compression_Ratio']),
@@ -309,32 +159,43 @@ function normalizeImageTrack(track: MediaInfoRecord): MediaInfoImageTrack {
     const format = parseString(track['Format']);
     const width = parseFiniteInteger(track['Width']);
     const height = parseFiniteInteger(track['Height']);
+    const codec = normalizeIdentifier(format) ?? 'unknown';
+    const codecId = parseString(track['CodecID']);
 
-    const type = parseString(track['Type']);
-    const typeString = parseString(track['Type_String']);
+    const streamIndex =
+        parseFiniteInteger(track['StreamOrder']) ??
+        parseFiniteInteger(track['StreamKindPos']) ??
+        parseFiniteInteger(track['StreamKindID']) ??
+        0;
 
     return {
+        index: streamIndex,
         streamKindId: parseFiniteInteger(track['StreamKindID']),
         streamPosition: parseFiniteInteger(track['StreamKindPos']),
         streamOrder: parseFiniteInteger(track['StreamOrder']),
 
         uniqueId: parseString(track['UniqueID']),
 
-        type,
-        typeString,
+        type: parseString(track['Type']),
+        typeString: parseString(track['Type_String']),
 
-        format: normalizeIdentifier(format) ?? 'unknown',
+        codec,
+        codecLongName: parseString(track['Format_Info']),
+        codecId,
+        codecTag: codecId,
+        format: codec,
         formatName: format,
-        codecId: parseString(track['CodecID']),
         codecIdDescription: parseString(track['CodecID_Description']),
         profile: parseString(track['Format_Profile']),
         formatVersion: parseString(track['Format_Version']),
         formatSettings: parseString(track['Format_Settings']),
         internetMediaType: parseString(track['InternetMediaType']),
+        mimeType: parseString(track['InternetMediaType']),
         muxingMode: parseString(track['MuxingMode']),
 
         width,
         height,
+        aspectRatio: width && height ? Number((width / height).toFixed(6)) : undefined,
 
         colorSpace: parseString(track['ColorSpace']),
         chromaSubsampling: parseString(track['ChromaSubsampling']),
@@ -639,7 +500,10 @@ export class MediaInfoAdapter {
     private readonly nativeAdapter: MediaInfoNativeAdapter;
     private readonly wasmAdapter: MediaInfoWasmAdapter;
 
-    constructor(binaryPath = serverEnv.MEDIAINFO_PATH, wasmAdapter = new MediaInfoWasmAdapter()) {
+    constructor(
+        binaryPath = serverEnv.MEDIAINFO_PATH,
+        wasmAdapter = new MediaInfoWasmAdapter()
+    ) {
         this.nativeAdapter = new MediaInfoNativeAdapter(binaryPath);
         this.wasmAdapter = wasmAdapter;
     }

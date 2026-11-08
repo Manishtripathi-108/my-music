@@ -9,14 +9,14 @@ import { clamp, parseFiniteNumber } from '@/lib/number';
 
 import { FFprobeAdapter } from './adapters/ffprobe.adapter';
 import { authorizeInputPath, authorizeOutputPath } from './path-security';
-import type { ConversionOptions, ConversionProgress, ConversionProgressCallback, ConversionResult, MediaConverterEngine } from './types';
+import type { ConversionOptions, ConversionProgress, ConversionProgressCallback, ConversionResult } from './types';
 
 /**
  * Audio Conversion and Digital Signal Processing (DSP) Engine.
  * Wraps native FFmpeg with libsoxr resampling, triangular dithering,
  * real-time progress parsing, and atomic sibling temp delivery.
  */
-export class MediaConverter implements MediaConverterEngine {
+export class MediaConverter {
     private readonly ffmpegPath: string;
     private readonly prober: FFprobeAdapter;
 

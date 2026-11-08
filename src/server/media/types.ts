@@ -1,23 +1,5 @@
 import type { AudioTags, ConversionTargetFormat, WriteAudioTags } from '@/lib/media';
 
-import type {
-    FFprobeAudioStream,
-    FFprobeCodecType,
-    FFprobeCoverArt,
-    FFprobeInspectionResult,
-    FFprobeNormalizedResult,
-    FFprobeRawOutput,
-    FFprobeStream,
-} from './adapters/ffprobe.adapter';
-import type {
-    MediaInfoAudioTrack,
-    MediaInfoImageTrack,
-    MediaInfoInspectionResult,
-    MediaInfoNormalizedResult,
-    MediaInfoOtherStream,
-    MediaInfoStreamCounts,
-} from './adapters/mediainfo.adapter';
-
 /* -------------------------- Artwork Domain Models ------------------------- */
 
 export interface ExtractedArtwork {
@@ -35,29 +17,262 @@ export interface RawPictureData {
     description?: string;
 }
 
-/* ------------------------- Technical Probing Models ----------------------- */
+/* ----------------------- Unified Elementary Probing Models ---------------- */
+
+/**
+ * Standardized audio stream properties shared between FFprobe and MediaInfo.
+ * Fields with the same semantic responsibility share identical names and types across engines.
+ */
+export interface AudioStreamInfo {
+    index: number;
+    default?: boolean;
+
+    codec: string;
+    codecLongName?: string;
+    codecId?: string;
+    codecTag?: string;
+    profile?: string;
+
+    sampleFormat?: string;
+    sampleRate?: number;
+
+    channels: number;
+    channelLayout?: string;
+
+    /** Primary true bit depth (e.g. 16, 24, 32 bit). */
+    bitDepth?: number;
+    /** Container/stream-specified bits per sample. */
+    bitsPerSample?: number;
+    /** Raw decoded bits per sample. */
+    bitsPerRawSample?: number;
+
+    bitRate?: number;
+    bitRateMode?: string;
+    bitRateModeLabel?: string;
+
+    duration?: number;
+    streamSize?: number;
+    language?: string;
+    isLossless: boolean;
+}
+
+/**
+ * Standardized cover art / attached image track properties shared between engines.
+ */
+export interface CoverArtInfo {
+    index: number;
+    type?: string;
+    typeString?: string;
+
+    codec: string;
+    codecLongName?: string;
+    codecId?: string;
+    codecTag?: string;
+    profile?: string;
+
+    width?: number;
+    height?: number;
+    aspectRatio?: number;
+    mimeType?: string;
+
+    sampleAspectRatio?: string;
+    displayAspectRatio?: string;
+}
+
+/* ------------------------- FFprobe Engine Models -------------------------- */
+
+export type FFprobeAudioStream = AudioStreamInfo;
+export type FFprobeCoverArt = CoverArtInfo;
+
+export interface FFprobeNormalizedResult {
+    container: string;
+    containerFormat?: string;
+    containerLongName?: string;
+    duration?: number;
+    bitRate?: number;
+    size: number;
+    probeScore?: number;
+    isLossless: boolean;
+    hasAudio: boolean;
+    hasCoverArt: boolean;
+    coverArts: CoverArtInfo[];
+    audio: AudioStreamInfo[];
+}
+
+export interface FFprobeInspectionResult extends FFprobeNormalizedResult {
+    raw: unknown;
+}
 
 export type TechnicalAudioInfo = FFprobeInspectionResult;
+
+/* ----------------------- MediaInfo Forensic QC Models --------------------- */
+
+export interface MediaInfoAudioTrack extends AudioStreamInfo {
+    streamKindId?: number;
+    streamPosition?: number;
+    streamOrder?: number;
+
+    uniqueId?: string;
+
+    format?: string;
+    formatCommercial?: string;
+    codecIdDescription?: string;
+    formatVersion?: string;
+    formatSettings?: string;
+    additionalFeatures?: string;
+    internetMediaType?: string;
+    muxingMode?: string;
+
+    bitRateEncoded?: number;
+    bitRateMinimum?: number;
+    bitRateMaximum?: number;
+    bitRateNominal?: number;
+
+    channelsOriginal?: number;
+    channelLayoutOriginal?: string;
+    channelPositions?: string;
+    channelPositionsOriginal?: string;
+    channelPositionsString2?: string;
+
+    sampleCount?: number;
+
+    bitDepthDetected?: number;
+    bitDepthStored?: number;
+
+    compressionMode?: string;
+    compressionRatio?: number;
+
+    durationFirstFrame?: number;
+    durationLastFrame?: number;
+
+    streamSizeEncoded?: number;
+    streamSizeDemuxed?: number;
+    streamSizeProportion?: number;
+
+    forced?: boolean;
+    disabled?: boolean;
+
+    encodedLibrary?: string;
+    encodedLibraryString?: string;
+    encodedLibraryName?: string;
+    encodedLibraryVersion?: string;
+    encodedLibrarySettings?: string;
+
+    encodedApplication?: string;
+    encodedApplicationVersion?: string;
+
+    audioMd5?: string;
+}
+
+export interface MediaInfoImageTrack extends CoverArtInfo {
+    streamKindId?: number;
+    streamPosition?: number;
+    streamOrder?: number;
+
+    uniqueId?: string;
+
+    format?: string;
+    formatName?: string;
+    codecIdDescription?: string;
+    formatVersion?: string;
+    formatSettings?: string;
+    internetMediaType?: string;
+    muxingMode?: string;
+
+    colorSpace?: string;
+    chromaSubsampling?: string;
+    bitDepth?: number;
+    compressionMode?: string;
+    compressionRatio?: number;
+
+    colorDescriptionPresent?: string;
+    colorPrimaries?: string;
+    colorRange?: string;
+    matrixCoefficients?: string;
+    transferCharacteristics?: string;
+
+    streamSize?: number;
+    streamSizeProportion?: number;
+
+    default?: boolean;
+    forced?: boolean;
+    disabled?: boolean;
+}
+
+export interface MediaInfoOtherStream {
+    type: string;
+    streamKindId?: number;
+    streamPosition?: number;
+    streamOrder?: number;
+
+    format?: string;
+    codecId?: string;
+    codecLongName?: string;
+
+    duration?: number;
+    streamSize?: number;
+
+    width?: number;
+    height?: number;
+    channels?: number;
+    sampleRate?: number;
+
+    language?: string;
+}
+
+export interface MediaInfoStreamCounts {
+    total: number;
+    audio: number;
+    image: number;
+    video: number;
+    text: number;
+    menu: number;
+    other: number;
+    unknown: number;
+}
+
+export interface MediaInfoNormalizedResult {
+    container: string;
+    containerFormat?: string;
+    containerLongName?: string;
+    containerCommercial?: string;
+    containerProfile?: string;
+    containerVersion?: string;
+    containerCodecId?: string;
+    mimeType?: string;
+
+    duration?: number;
+    bitRate?: number;
+    bitRateMode?: string;
+    bitRateModeLabel?: string;
+    bitRateMinimum?: number;
+    bitRateMaximum?: number;
+    bitRateNominal?: number;
+
+    size?: number;
+    dataSize?: number;
+    headerSize?: number;
+    footerSize?: number;
+
+    isStreamable?: boolean;
+    audioChannelsTotal?: number;
+
+    streamCounts: MediaInfoStreamCounts;
+
+    hasAudio: boolean;
+    hasCoverArt: boolean;
+    isLossless: boolean;
+
+    audio: MediaInfoAudioTrack[];
+    coverArts: MediaInfoImageTrack[];
+    otherStreams: MediaInfoOtherStream[];
+}
+
+export interface MediaInfoInspectionResult extends MediaInfoNormalizedResult {
+    raw: unknown;
+}
+
 export type MediaInfoQC = MediaInfoInspectionResult;
-
-export type {
-    FFprobeCodecType,
-    FFprobeRawOutput,
-    FFprobeStream,
-    FFprobeAudioStream,
-    FFprobeCoverArt,
-    FFprobeNormalizedResult,
-    FFprobeInspectionResult,
-};
-
-export type {
-    MediaInfoAudioTrack,
-    MediaInfoImageTrack,
-    MediaInfoOtherStream,
-    MediaInfoStreamCounts,
-    MediaInfoNormalizedResult,
-    MediaInfoInspectionResult,
-};
 
 /* ------------------------ Unified Metadata Models ------------------------- */
 
@@ -168,5 +383,10 @@ export interface QualityControlAdapter {
 
 /** Media Converter Engine interface for audio transcoding and DSP operations. */
 export interface MediaConverterEngine {
-    convert(inputPath: string, options: ConversionOptions, onProgress?: ConversionProgressCallback, signal?: AbortSignal): Promise<ConversionResult>;
+    convert(
+        inputPath: string,
+        options: ConversionOptions,
+        onProgress?: ConversionProgressCallback,
+        signal?: AbortSignal
+    ): Promise<ConversionResult>;
 }

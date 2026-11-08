@@ -1,0 +1,61 @@
+info:
+  name: Start Scan - Enqueue Asynchronous Task (202)
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/scan"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "directory": "E:/Music",
+        "scanMode": "addNew",
+        "recursive": true
+      }
+  auth:
+    type: bearer
+    token: "{{authToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should accept scan request with 202 status", function() {
+          expect(res.getStatus()).to.equal(202);
+          expect(res.getBody().success).to.be.true;
+          expect(res.getBody().data.scanId).to.be.a('string');
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "202"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.scanId
+      operator: isDefined
+    - expression: res.body.data.directory
+      operator: eq
+      value: E:/Music
+    - expression: res.body.data.scanMode
+      operator: eq
+      value: addNew
+    - expression: res.body.data.recursive
+      operator: eq
+      value: "true"
+    - expression: res.body.data.timestamp
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

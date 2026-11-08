@@ -1,0 +1,13 @@
+variables:
+  - name: baseUrl
+    value: https://my-music.example.com
+  - name: sampleAudioPath
+    value: /var/music/sample.mp3
+  - name: sampleAudioPathFlac
+    value: /var/music/sample.flac
+  - name: sampleArtworkFilename
+    value: sample.jpg
+  - name: nonExistentAudioPath
+    value: /var/music/non-existent-track-999.flac
+  - name: authToken
+    value: prod-secret-token

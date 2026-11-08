@@ -1,0 +1,48 @@
+info:
+  name: Convert Audio - Invalid Format (422)
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/media/convert"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "inputPath": "{{sampleAudioPathFlac}}",
+        "targetFormat": "unsupported_codec_xyz"
+      }
+  auth:
+    type: bearer
+    token: "{{authToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("rejects invalid target format with 422 validation error", function() {
+          expect(res.getStatus()).to.equal(422);
+          expect(res.getBody().success).to.be.false;
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "422"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

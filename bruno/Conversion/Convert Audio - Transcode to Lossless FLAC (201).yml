@@ -1,0 +1,53 @@
+info:
+  name: Convert Audio - Transcode to Lossless FLAC (201)
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/media/convert"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "inputPath": "{{sampleAudioPath}}",
+        "targetFormat": "flac",
+        "bitDepth": 24
+      }
+  auth:
+    type: bearer
+    token: "{{authToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("transcodes audio to 24-bit FLAC", function() {
+          expect(res.getStatus()).to.equal(201);
+          expect(res.getBody().success).to.be.true;
+          expect(res.getBody().data.targetFormat).to.equal("flac");
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.targetFormat
+      operator: eq
+      value: '"flac"'
+    - expression: res.body.data.outputPath
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

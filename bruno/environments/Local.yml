@@ -1,0 +1,13 @@
+variables:
+  - name: baseUrl
+    value: http://localhost:3000
+  - name: sampleAudioPath
+    value: E:/Code/Next/my-music/music-files/Psycho! - Masn.m4a
+  - name: sampleAudioPathFlac
+    value: E:/Code/Next/my-music/music-files/Ava - Famy.flac
+  - name: sampleArtworkFilename
+    value: sample.jpg
+  - name: nonExistentAudioPath
+    value: E:/Code/Next/my-music/music-files/non-existent-track-999.flac
+  - name: authToken
+    value: dev-local-token

@@ -1,0 +1,48 @@
+info:
+  name: Extract Artwork Metadata - File Not Found (404)
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/media/artwork"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "path": "{{nonExistentAudioPath}}"
+      }
+  auth:
+    type: bearer
+    token: "{{authToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should return 404 when file does not exist", function() {
+          expect(res.getStatus()).to.equal(404);
+          expect(res.getBody().success).to.be.false;
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: NOT_FOUND
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
